@@ -1,0 +1,18 @@
+{
+  "users": [
+    {
+      "id": "b992ee97-ad67-4a72-ae4e-6de14c18c88b",
+      "name": "Axmadullo Abdurashidov",
+      "phone": "+998948293100",
+      "company": "Farand",
+      "password": "$2a$10$pIvLUmoojMKtYqoQJPW6JOTdcOUg2P3oKm.uD5dvY/9FqFb2aYa4O",
+      "createdAt": "2026-04-03T07:56:36.036Z"
+    }
+  ],
+  "savedTenders": {
+    "b992ee97-ad67-4a72-ae4e-6de14c18c88b": [
+      "it-001"
+    ]
+  },
+  "wonTenders": {}
+}
