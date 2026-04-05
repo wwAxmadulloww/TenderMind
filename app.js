@@ -5,7 +5,10 @@
 
 'use strict';
 
-const API = 'http://localhost:4010'; // Gemini AI server (port 4010)
+// Frontend endi host etilgan domenga avtomatik moslashadi (Render yoki Localhost)
+const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+  ? 'http://localhost:4020' 
+  : '';
 
 // ── State ──────────────────────────────────────────────────────────
 const state = {
