@@ -21,10 +21,15 @@ const PDFDocument = require('pdfkit');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const logger    = require('./logger');
 const { validateBody, sanitizeBody, normalizeUzbekPhone } = require('./validators');
+const { connectDB, User, mongoose } = require('./db');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === 'production';
+
+// ── MongoDB o'rnatilishi ─────────────────────────────────────────────────
+// Local db.json endi ishlatilmaydi, MongoDB orqali ma'lumotlar boshqariladi.
+connectDB();
 
 let JWT_SECRET = process.env.JWT_SECRET && String(process.env.JWT_SECRET).trim();
 if (!JWT_SECRET) {
@@ -103,11 +108,8 @@ app.use(helmet({
 // CORS — barcha localhost portlarga ruxsat (development)
 app.use(cors({
   origin: (origin, callback) => {
-    // origin yo'q (curl, Postman) — ruxsat
-    if (!origin) return callback(null, true);
-    // localhost istalgan portda — ruxsat
-    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
-    callback(new Error('CORS: ruxsatsiz domen'));
+    // Render tarmog'ida va istalgan joyda ishlashi uchun barcha originlarga ruxsat beramiz
+    callback(null, true);
   },
   credentials: true
 }));
@@ -146,64 +148,7 @@ app.use('/api/auth/', apiLimiter);
 app.use('/api/generate', aiLimiter);
 app.use('/api/strategy', aiLimiter);
 
-// ── Simple JSON "DB" ─────────────────────────────────────────────────
-const DB_FILE = path.join(__dirname, 'db.json');
-function readDB() {
-  if (!fs.existsSync(DB_FILE)) {
-    const init = { users: [], savedTenders: {}, wonTenders: {} };
-    writeDB(init);
-    return init;
-  }
-  try {
-    const raw = fs.readFileSync(DB_FILE, 'utf8');
-    const data = JSON.parse(raw);
-    if (!data.wonTenders) data.wonTenders = {};
-    return data;
-  } catch (err) {
-    logger.error('db.json o‘qilmadi yoki buzilgan', err);
-    try {
-      fs.copyFileSync(DB_FILE, `${DB_FILE}.corrupt.${Date.now()}`);
-    } catch (e) { /* ignore */ }
-    const init = { users: [], savedTenders: {}, wonTenders: {} };
-    writeDB(init);
-    return init;
-  }
-}
-function writeDB(data) {
-  const tmp = `${DB_FILE}.${process.pid}.tmp`;
-  const json = JSON.stringify(data, null, 2);
-  fs.writeFileSync(tmp, json, 'utf8');
-  fs.renameSync(tmp, DB_FILE);
-}
 
-// XATO #8 TUZATMA: Race condition uchun xavfsiz yozish navbat tizimi
-let _writing = false;
-const _writeQueue = [];
-
-// Parallel async writelarni navbatga solib, atomic yozish
-async function writeDBSafe(data) {
-  return new Promise((resolve, reject) => {
-    _writeQueue.push({ data, resolve, reject });
-    if (!_writing) processWriteQueue();
-  });
-}
-
-async function processWriteQueue() {
-  if (_writing || _writeQueue.length === 0) return;
-  _writing = true;
-  const { data, resolve, reject } = _writeQueue.shift();
-  try {
-    const tmp = `${DB_FILE}.${Date.now()}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
-    fs.renameSync(tmp, DB_FILE);
-    resolve();
-  } catch (err) {
-    reject(err);
-  } finally {
-    _writing = false;
-    processWriteQueue();
-  }
-}
 
 // ── Auth Middleware ───────────────────────────────────────────────────
 function authMiddleware(req, res, next) {
@@ -867,15 +812,7 @@ function normalizeAuthPhone(req, res, next) {
   next();
 }
 
-function phonesMatch(stored, normalizedInput) {
-  if (!stored || !normalizedInput) return false;
-  if (stored === normalizedInput) return true;
-  return normalizeUzbekPhone(String(stored)) === normalizedInput;
-}
-
-function findUserByPhone(db, normalizedPhone) {
-  return db.users.find(u => phonesMatch(u.phone, normalizedPhone));
-}
+// legacy phonesMatch functionality removed due to MongoDB Native Search
 
 app.post('/api/auth/register',
   authRegisterSanitize,
@@ -884,16 +821,18 @@ app.post('/api/auth/register',
   async (req, res) => {
   const { name, phone, password, company } = req.body;
 
-  const db = readDB();
-  if (findUserByPhone(db, phone)) {
+  const existingUser = await User.findOne({ phone });
+  if (existingUser) {
     return res.status(409).json({ error: 'Bu telefon raqam allaqachon ro\'yxatdan o\'tgan' });
   }
 
   const hashedPwd = await bcrypt.hash(password, 10);
-  const user = { id: uuidv4(), name, phone, company: company || '', password: hashedPwd, createdAt: new Date().toISOString() };
-  db.users.push(user);
-  // XATO #8 TUZATMA: xavfsiz yozish funksiyasidan foydalanish
-  await writeDBSafe(db);
+  const user = await User.create({ 
+    name, 
+    phone, 
+    company: company || '', 
+    passwordHash: hashedPwd 
+  });
 
   const token = jwt.sign({ id: user.id, name: user.name, phone: user.phone }, JWT_SECRET, { expiresIn: '30d' });
   res.status(201).json({ success: true, token, user: { id: user.id, name: user.name, phone: user.phone, company: user.company } });
@@ -905,72 +844,68 @@ app.post('/api/auth/login',
   async (req, res) => {
   const { phone, password } = req.body;
 
-  const db = readDB();
-  const user = findUserByPhone(db, phone);
+  const user = await User.findOne({ phone });
   if (!user) return res.status(401).json({ error: 'Telefon yoki parol noto\'g\'ri' });
 
-  const ok = await bcrypt.compare(password, user.password);
+  const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return res.status(401).json({ error: 'Telefon yoki parol noto\'g\'ri' });
 
   const token = jwt.sign({ id: user.id, name: user.name, phone: user.phone }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ success: true, token, user: { id: user.id, name: user.name, phone: user.phone, company: user.company } });
 });
 
-app.get('/api/auth/me', authMiddleware, (req, res) => {
-  const db = readDB();
-  const user = db.users.find(u => u.id === req.user.id);
+app.get('/api/auth/me', authMiddleware, async (req, res) => {
+  const user = await User.findOne({ id: req.user.id });
   if (!user) return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
   res.json({ id: user.id, name: user.name, phone: user.phone, company: user.company });
 });
 
 // ── SAVED TENDERS ────────────────────────────────────────────────────
-app.get('/api/saved', authMiddleware, (req, res) => {
-  const db = readDB();
-  const savedIds = db.savedTenders[req.user.id] || [];
+app.get('/api/saved', authMiddleware, async (req, res) => {
+  const user = await User.findOne({ id: req.user.id });
+  const savedIds = user ? user.savedTenders : [];
   const tenders = savedIds.map(id => TENDERS_DB.find(t => t.id === id)).filter(Boolean);
   res.json(tenders);
 });
 
 app.post('/api/saved/:id', authMiddleware, async (req, res) => {
-  const db = readDB();
   const userId = req.user.id;
-  if (!db.savedTenders[userId]) db.savedTenders[userId] = [];
+  const user = await User.findOne({ id: userId });
+  if (!user) return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
 
-  const idx = db.savedTenders[userId].indexOf(req.params.id);
+  const idx = user.savedTenders.indexOf(req.params.id);
   if (idx > -1) {
-    db.savedTenders[userId].splice(idx, 1);
-    // XATO #8 TUZATMA: xavfsiz yozish
-    await writeDBSafe(db);
+    user.savedTenders.splice(idx, 1);
+    await user.save();
     res.json({ saved: false, message: 'Saqlangan tenderlardan olib tashlandi' });
   } else {
-    db.savedTenders[userId].push(req.params.id);
-    await writeDBSafe(db);
+    user.savedTenders.push(req.params.id);
+    await user.save();
     res.json({ saved: true, message: 'Tender saqlandi!' });
   }
 });
 
 // ── WON TENDERS ──────────────────────────────────────────────────────
-app.get('/api/won', authMiddleware, (req, res) => {
-  const db = readDB();
-  const wonIds = db.wonTenders[req.user.id] || [];
+app.get('/api/won', authMiddleware, async (req, res) => {
+  const user = await User.findOne({ id: req.user.id });
+  const wonIds = user ? user.wonTenders : [];
   const tenders = wonIds.map(id => TENDERS_DB.find(t => t.id === id)).filter(Boolean);
   res.json(tenders);
 });
 
 app.post('/api/won/:id', authMiddleware, async (req, res) => {
-  const db = readDB();
   const userId = req.user.id;
-  if (!db.wonTenders[userId]) db.wonTenders[userId] = [];
+  const user = await User.findOne({ id: userId });
+  if (!user) return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
 
-  const idx = db.wonTenders[userId].indexOf(req.params.id);
+  const idx = user.wonTenders.indexOf(req.params.id);
   if (idx > -1) {
-    db.wonTenders[userId].splice(idx, 1);
-    // XATO #8 TUZATMA: xavfsiz yozish
-    await writeDBSafe(db);
+    user.wonTenders.splice(idx, 1);
+    await user.save();
     res.json({ won: false, message: 'Yutganlardan olib tashlandi' });
   } else {
-    db.wonTenders[userId].push(req.params.id);
-    await writeDBSafe(db);
+    user.wonTenders.push(req.params.id);
+    await user.save();
     res.json({ won: true, message: "Tabriklaymiz! Tender yutilganlar safiga qo'shildi 🏆" });
   }
 });
@@ -982,7 +917,7 @@ app.get('/api/health', (req, res) => {
     version: '2.0.0',
     timestamp: new Date().toISOString(),
     ai: isGeminiConfigured() ? 'gemini-configured' : 'not_configured',
-    db: fs.existsSync(DB_FILE) ? 'ok' : 'missing'
+    db: mongoose.connection.readyState === 1 ? 'ok' : 'missing'
   });
 });
 
@@ -990,31 +925,24 @@ app.get('/api/health', (req, res) => {
 app.put('/api/auth/change-password', authMiddleware, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
-  // Maydonlar to'liqligini tekshirish
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: 'Hamma maydonlar talab qilinadi' });
   }
-  // Yangi parol uzunligi va bo'shliq tekshiruvi
   if (newPassword.length < 6 || /\s/.test(newPassword)) {
     return res.status(400).json({ error: 'Yangi parol kamida 6 belgi, bo\'shliqsiz' });
   }
-  // Yangi va eski parol mos kelmasa
   if (currentPassword === newPassword) {
     return res.status(400).json({ error: 'Yangi parol eski paroldan farq qilishi kerak' });
   }
 
-  const db = readDB();
-  const user = db.users.find(u => u.id === req.user.id);
+  const user = await User.findOne({ id: req.user.id });
   if (!user) return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
 
-  // Joriy parolni solishtirish
-  const ok = await bcrypt.compare(currentPassword, user.password);
+  const ok = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!ok) return res.status(401).json({ error: 'Joriy parol noto\'g\'ri' });
 
-  // Yangi parolni hash qilib saqlash
-  user.password = await bcrypt.hash(newPassword, 10);
-  user.passwordChangedAt = new Date().toISOString();
-  await writeDBSafe(db);
+  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  await user.save();
 
   res.json({ success: true, message: 'Parol muvaffaqiyatli o\'zgartirildi' });
 });
@@ -1023,24 +951,19 @@ app.put('/api/auth/change-password', authMiddleware, async (req, res) => {
 app.put('/api/auth/profile', authMiddleware, async (req, res) => {
   const { name, company } = req.body;
 
-  // Ism uzunligini tekshirish
   if (name && (name.length < 2 || name.length > 50)) {
     return res.status(400).json({ error: 'Ism 2-50 belgi bo\'lishi kerak' });
   }
-  // Kompaniya uzunligini tekshirish
   if (company && company.length > 100) {
     return res.status(400).json({ error: 'Kompaniya nomi 100 belgidan oshmasin' });
   }
 
-  const db = readDB();
-  const user = db.users.find(u => u.id === req.user.id);
+  const user = await User.findOne({ id: req.user.id });
   if (!user) return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
 
-  // Faqat yuborilgan maydonlarni yangilash
   if (name) user.name = name.trim();
   if (company !== undefined) user.company = company.trim();
-  user.updatedAt = new Date().toISOString();
-  await writeDBSafe(db);
+  await user.save();
 
   res.json({
     success: true,
