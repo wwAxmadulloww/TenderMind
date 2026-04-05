@@ -9,9 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
-  <script src="i18n.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <script src="app.js"></script>
+  <!-- XATO #1 TUZATMA: script taglar HEAD ichida bo'lmasligi kerak
+       app.js va i18n.js faqat body oxirida yuklanadi — pastga qarang -->
 </head>
 <body>
 
@@ -444,13 +443,13 @@
               
               <div class="generated-docs" id="generated-docs" style="display:none;">
                 <div class="doc-tabs" style="overflow-x:auto;flex-wrap:nowrap">
-                  <button class="doc-tab active" onclick="switchDocTab('ariza')" style="white-space:nowrap;font-size:11px">📋 Ariza</button>
-                  <button class="doc-tab" onclick="switchDocTab('kafolat')" style="white-space:nowrap;font-size:11px">🛡️ Kafolat</button>
-                  <button class="doc-tab" onclick="switchDocTab('kompaniya')" style="white-space:nowrap;font-size:11px">🏢 Profil</button>
-                  <button class="doc-tab" onclick="switchDocTab('texnik')" style="white-space:nowrap;font-size:11px">⚙️ Texnik</button>
-                  <button class="doc-tab" onclick="switchDocTab('narx')" style="white-space:nowrap;font-size:11px">💰 Narx</button>
-                  <button class="doc-tab" onclick="switchDocTab('moliya')" style="white-space:nowrap;font-size:11px">📊 Moliya</button>
-                  <button class="doc-tab" onclick="switchDocTab('vakolat')" style="white-space:nowrap;font-size:11px">📝 Vakolat</button>
+                  <button type="button" class="doc-tab active" onclick="switchDocTab('ariza', this)" style="white-space:nowrap;font-size:11px">📋 Ariza</button>
+                  <button type="button" class="doc-tab" onclick="switchDocTab('kafolat', this)" style="white-space:nowrap;font-size:11px">🛡️ Kafolat</button>
+                  <button type="button" class="doc-tab" onclick="switchDocTab('kompaniya', this)" style="white-space:nowrap;font-size:11px">🏢 Profil</button>
+                  <button type="button" class="doc-tab" onclick="switchDocTab('texnik', this)" style="white-space:nowrap;font-size:11px">⚙️ Texnik</button>
+                  <button type="button" class="doc-tab" onclick="switchDocTab('narx', this)" style="white-space:nowrap;font-size:11px">💰 Narx</button>
+                  <button type="button" class="doc-tab" onclick="switchDocTab('moliya', this)" style="white-space:nowrap;font-size:11px">📊 Moliya</button>
+                  <button type="button" class="doc-tab" onclick="switchDocTab('vakolat', this)" style="white-space:nowrap;font-size:11px">📝 Vakolat</button>
                 </div>
                 
                 <div id="ai-model-label" style="padding:8px 20px;font-size:11px;color:var(--accent);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border)"></div>
@@ -520,6 +519,28 @@
               </div>
             </div>
           </div>
+
+          <!-- QO'SHIMCHA #8: Profil yangilash panel -->
+          <div class="cab-section" style="margin-top:24px">
+            <h4 class="cab-section-title" style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:12px">✏️ Profil Yangilash</h4>
+            <form onsubmit="updateProfile(event)" style="display:flex;flex-direction:column;gap:12px;max-width:400px">
+              <input type="text" id="update-name" class="form-input" placeholder="Ism Familiya" />
+              <input type="text" id="update-company" class="form-input" placeholder="Kompaniya nomi" />
+              <button type="submit" id="update-profile-btn" class="btn-primary" style="width:fit-content;padding:10px 24px">Saqlash</button>
+            </form>
+          </div>
+
+          <!-- QO'SHIMCHA #8: Parol o'zgartirish panel -->
+          <div class="cab-section" style="margin-top:32px">
+            <h4 class="cab-section-title" style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:12px">🔒 Parolni O'zgartirish</h4>
+            <form onsubmit="changePassword(event)" style="display:flex;flex-direction:column;gap:12px;max-width:400px">
+              <input type="password" id="current-password" class="form-input" placeholder="Joriy parol" required />
+              <input type="password" id="new-password" class="form-input" placeholder="Yangi parol (kamida 6 belgi)" required />
+              <input type="password" id="confirm-password" class="form-input" placeholder="Yangi parolni tasdiqlang" required />
+              <button type="submit" id="change-pwd-btn" class="btn-primary" style="width:fit-content;padding:10px 24px">O'zgartirish</button>
+            </form>
+          </div>
+
         </div>
       </div>
 
@@ -594,8 +615,8 @@
     <div class="ai-chat-header-left">
       <div class="ai-avatar">🤖</div>
       <div>
-        <div class="ai-chat-title">TenderMind AI</div>
-        <div class="ai-chat-status"><span class="ai-dot pulsing"></span> Tender eksperti</div>
+        <div class="ai-chat-title">AI Maslahatchi</div>
+        <div class="ai-chat-status"><span class="ai-dot pulsing"></span> Suhbat · tender va xaridlar</div>
       </div>
     </div>
     <div class="ai-chat-header-right">
@@ -609,20 +630,20 @@
       <div class="ai-msg-avatar">🤖</div>
       <div class="ai-msg-bubble">
         <b>Assalomu alaykum! 👋</b><br><br>
-        Men TenderMind AI Maslahatchi — tender bo'yicha ekspertman. Sizga yordam bera oladigan sohalar:<br><br>
-        🔍 <b>Tender tanlash</b> — qaysi tender sizga mos<br>
-        💰 <b>Narx strategiyasi</b> — qancha taklif qilish kerak<br>
-        📝 <b>Hujjat tayyorlash</b> — qanday hujjatlar kerak<br>
-        🏆 <b>G'alaba strategiyasi</b> — qanday yutish mumkin<br><br>
-        <i>Savolingizni yozing yoki tenderlar sahifasidan tender tanlang!</i>
+        Men <b>AI maslahatchi</b>man — tenderlar, davlat xaridlari, hujjatlar va strategiya bo'yicha <b>har qanday savolga</b> javob berishga harakat qilaman (ChatGPT/Claude uslubida suhbat).<br><br>
+        • Yangi boshlovchisizmi? <i>«Tender nima, tushunmayman»</i> deb yozing — oddiy tilda tushuntiraman.<br>
+        • Ilovadagi tenderlarni tanlasangiz, shu e'lon bo'yicha chuqurroq gaplashamiz.<br><br>
+        <i>Enter — yuborish, Shift+Enter — yangi qator.</i>
       </div>
     </div>
   </div>
   <div class="ai-chat-suggestions" id="ai-chat-suggestions">
-    <button class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Menga mos tender tavsiya qil')">🎯 Mos tender</button>
-    <button class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Tenderni qanday yutish mumkin?')">🏆 Yutish sirri</button>
-    <button class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Qanday hujjatlar kerak?')">📝 Hujjatlar</button>
-    <button class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Narx strategiyasi qanday?')">💰 Narx</button>
+    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Tender nima? Men tushunmayman, oddiy tilda tushuntirib ber')">❓ Tender nima?</button>
+    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Davlat xaridi va oddiy xarid o\'rtasida nima farq bor?')">⚖️ Farqi nima?</button>
+    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Menga mos tender qanday tanlash mumkin?')">🎯 Mos tender</button>
+    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Qatnashish uchun qanday hujjatlar kerak bo\'ladi?')">📝 Hujjatlar</button>
+    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Narx taklifini qanday asoslash kerak?')">💰 Narx</button>
+    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('xarid.uz portali haqida nimalarni bilishim kerak?')">🌐 xarid.uz</button>
   </div>
   <div class="ai-chat-footer">
     <div class="ai-chat-context" id="ai-chat-context" style="display:none">
@@ -630,8 +651,8 @@
       <button onclick="clearChatContext()" class="context-clear">✕</button>
     </div>
     <form class="ai-chat-input-form" onsubmit="sendAIChat(event)">
-      <input type="text" id="ai-chat-input" class="ai-chat-input" placeholder="Savolingizni yozing..." autocomplete="off" />
-      <button type="submit" class="ai-chat-send" id="ai-chat-send">➤</button>
+      <textarea id="ai-chat-input" class="ai-chat-input" rows="2" placeholder="Savolingizni yozing… (Enter — yuborish, Shift+Enter — yangi qator)" autocomplete="off"></textarea>
+      <button type="submit" class="ai-chat-send" id="ai-chat-send" title="Yuborish">➤</button>
     </form>
   </div>
 </div>

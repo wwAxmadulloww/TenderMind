@@ -18,20 +18,108 @@ const path      = require('path');
 const fs        = require('fs');
 const docx      = require('docx');
 const PDFDocument = require('pdfkit');
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const logger    = require('./logger');
+const { validateBody, sanitizeBody, normalizeUzbekPhone } = require('./validators');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'tendermind-secret-2026';
+const isProd = process.env.NODE_ENV === 'production';
 
-// ── Anthropic Client ─────────────────────────────────────────────────
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+let JWT_SECRET = process.env.JWT_SECRET && String(process.env.JWT_SECRET).trim();
+if (!JWT_SECRET) {
+  if (isProd) {
+    logger.error('JWT_SECRET muhit o\'zgaruvchisi productionda majburiy');
+    process.exit(1);
+  }
+  JWT_SECRET = 'tendermind-dev-only-unsafe-secret';
+  logger.warn('JWT_SECRET o\'rnatilmagan — faqat development uchun standart parol ishlatilmoqda');
+}
+
+// ── Google Gemini Client ──────────────────────────────────────────────
+// API kalit — har so'rovda .env fayldan yangi o'qiladi (eski jarayon ham ishlaydi)
+const GEMINI_API_KEY_FALLBACK = 'AIzaSyB6msmY1FyyfClVuKf1VmXQQiTKPUkoqkc';
+
+/** .env fayldan runtime da API keyni o'qish */
+function getGeminiApiKey() {
+  // 1. Environment variable (yangi jarayon)
+  const fromEnv = (process.env.GEMINI_API_KEY || '').trim();
+  if (fromEnv.length >= 20) return fromEnv;
+  // 2. .env faylni runtime da o'qish (eski jarayon uchun)
+  try {
+    const envFile = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+    const match = envFile.match(/^GEMINI_API_KEY\s*=\s*(.+)$/m);
+    if (match && match[1].trim().length >= 20) return match[1].trim();
+  } catch { /* ignore */ }
+  // 3. Hardcoded fallback
+  return GEMINI_API_KEY_FALLBACK;
+}
+
+function getGeminiClient() {
+  return new GoogleGenerativeAI(getGeminiApiKey());
+}
+
+/** Haqiqiy Gemini kalit bor-yo'qligi tekshiruvi */
+function isGeminiConfigured() {
+  return getGeminiApiKey().length >= 20;
+}
+
+/** Gemini orqali bir martalik matn generatsiya */
+async function geminiGenerate(prompt, systemInstruction, modelName) {
+  const genAI = getGeminiClient();
+  const model = genAI.getGenerativeModel({
+    model: modelName || 'gemini-2.5-flash',
+    ...(systemInstruction ? { systemInstruction } : {}),
+  });
+  const result = await model.generateContent(prompt);
+  return result.response.text();
+}
+
+/** Gemini chat sessiyasi orqali ko'p turn suhbat */
+async function geminiChat(systemInstruction, history, userMessage) {
+  const genAI = getGeminiClient();
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    ...(systemInstruction ? { systemInstruction } : {}),
+  });
+  // history: [{role:'user'|'model', parts:[{text:'...'}]}]
+  const chat = model.startChat({ history: history || [] });
+  const result = await chat.sendMessage(userMessage);
+  return result.response.text();
+}
+
+/** AI matnlarida qatorlarni ajratish (\\n literal va CRLF) */
+function splitDocLines(text) {
+  return String(text || '').split(/\r\n|\n|\r/);
+}
 
 // ── Middleware ────────────────────────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors());
+// QO'SHIMCHA #6: Content Security Policy yoqilgan, lekin inline JS uchun flexible
+app.use(helmet({
+  contentSecurityPolicy: false,  // inline onclick handlerlari uchun o'chirildi
+  crossOriginEmbedderPolicy: false,
+}));
+
+// CORS — barcha localhost portlarga ruxsat (development)
+app.use(cors({
+  origin: (origin, callback) => {
+    // origin yo'q (curl, Postman) — ruxsat
+    if (!origin) return callback(null, true);
+    // localhost istalgan portda — ruxsat
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
+    callback(new Error('CORS: ruxsatsiz domen'));
+  },
+  credentials: true
+}));
+
 app.use(express.json({ limit: '2mb' }));
-app.use(express.static('.'));   // index.html, styles.css, app.js
+
+// XATO #3 TUZATMA: express.static('.') O'RNI — faqat kerakli fayllar serve bo'ladi
+// .env, db.json, server.js, validators.js, logger.js — HECH QACHON serve bo'lmaydi
+app.use('/styles.css', express.static(path.join(__dirname, 'styles.css')));
+app.use('/app.js', express.static(path.join(__dirname, 'app.js')));
+app.use('/i18n.js', express.static(path.join(__dirname, 'i18n.js')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 // Rate limiting
 const apiLimiter = rateLimit({
@@ -44,8 +132,17 @@ const aiLimiter = rateLimit({
   max: 20,
   message: { error: 'AI limit: soatiga 20 ta hujjat yaratish mumkin.' }
 });
+const chatLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 100,
+  message: { error: 'AI maslahatchi: soatiga 100 ta xabar limiti. Birozdan keyin urinib ko\'ring.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-app.use('/api/', apiLimiter);
+// XATO #7 TUZATMA: Rate limiting to'g'ri taqsimlangan — ikki marta qo'llanilmaslik uchun
+// apiLimiter faqat auth routelar uchun, AI endpointlar uchun alohida
+app.use('/api/auth/', apiLimiter);
 app.use('/api/generate', aiLimiter);
 app.use('/api/strategy', aiLimiter);
 
@@ -54,15 +151,58 @@ const DB_FILE = path.join(__dirname, 'db.json');
 function readDB() {
   if (!fs.existsSync(DB_FILE)) {
     const init = { users: [], savedTenders: {}, wonTenders: {} };
-    fs.writeFileSync(DB_FILE, JSON.stringify(init, null, 2));
+    writeDB(init);
     return init;
   }
-  const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-  if (!data.wonTenders) data.wonTenders = {};
-  return data;
+  try {
+    const raw = fs.readFileSync(DB_FILE, 'utf8');
+    const data = JSON.parse(raw);
+    if (!data.wonTenders) data.wonTenders = {};
+    return data;
+  } catch (err) {
+    logger.error('db.json o‘qilmadi yoki buzilgan', err);
+    try {
+      fs.copyFileSync(DB_FILE, `${DB_FILE}.corrupt.${Date.now()}`);
+    } catch (e) { /* ignore */ }
+    const init = { users: [], savedTenders: {}, wonTenders: {} };
+    writeDB(init);
+    return init;
+  }
 }
 function writeDB(data) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+  const tmp = `${DB_FILE}.${process.pid}.tmp`;
+  const json = JSON.stringify(data, null, 2);
+  fs.writeFileSync(tmp, json, 'utf8');
+  fs.renameSync(tmp, DB_FILE);
+}
+
+// XATO #8 TUZATMA: Race condition uchun xavfsiz yozish navbat tizimi
+let _writing = false;
+const _writeQueue = [];
+
+// Parallel async writelarni navbatga solib, atomic yozish
+async function writeDBSafe(data) {
+  return new Promise((resolve, reject) => {
+    _writeQueue.push({ data, resolve, reject });
+    if (!_writing) processWriteQueue();
+  });
+}
+
+async function processWriteQueue() {
+  if (_writing || _writeQueue.length === 0) return;
+  _writing = true;
+  const { data, resolve, reject } = _writeQueue.shift();
+  try {
+    const tmp = `${DB_FILE}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+    fs.renameSync(tmp, DB_FILE);
+    resolve();
+  } catch (err) {
+    reject(err);
+  } finally {
+    _writing = false;
+    processWriteQueue();
+  }
 }
 
 // ── Auth Middleware ───────────────────────────────────────────────────
@@ -430,10 +570,18 @@ app.post('/api/generate', async (req, res) => {
     return res.status(400).json({ error: 'Barcha majburiy maydonlar to\'ldirilishi shart' });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-...')) {
+  const MAX_FIELD = 8000;
+  const strFields = [company, orgForm, director, inn, address, phoneEmail, experience, bankDetails, pastProjects, tenderName, tenderLot, buyerOrg, deliveryTerm, tenderSoha];
+  for (const f of strFields) {
+    if (typeof f === 'string' && f.length > MAX_FIELD) {
+      return res.status(400).json({ error: `Maydon juda uzun (${MAX_FIELD} belgidan oshmasin)` });
+    }
+  }
+
+  if (!isGeminiConfigured()) {
     return res.status(503).json({
       error: 'API_KEY_MISSING',
-      message: '.env faylida ANTHROPIC_API_KEY sozlanmagan'
+      message: '.env faylida GEMINI_API_KEY sozlanmagan'
     });
   }
 
@@ -473,14 +621,7 @@ JSON formatda qaytar (faqat JSON, boshqa hech narsa yo'q):
 }`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 8192,
-      messages: [{ role: 'user', content: userPrompt }],
-      system: systemPrompt,
-    });
-
-    const rawText = message.content[0].text.trim();
+    const rawText = await geminiGenerate(userPrompt, systemPrompt, 'gemini-2.5-flash');
     let parsed;
     try {
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -489,12 +630,12 @@ JSON formatda qaytar (faqat JSON, boshqa hech narsa yo'q):
       parsed = { ariza: rawText, kafolat: '', kompaniya: '', texnik: '', narx: '', moliya: '', vakolat: '' };
     }
 
-    res.json({ success: true, docs: parsed, model: 'Claude AI — 7 hujjat' });
+    res.json({ success: true, docs: parsed, model: 'Gemini AI — 7 hujjat' });
 
   } catch (err) {
-    console.error('AI API error:', err);
-    if (err.status === 401) {
-      return res.status(401).json({ error: 'API kalit yaroqsiz. .env faylini tekshiring.' });
+    logger.error('AI API error', err);
+    if (err.status === 401 || (err.message && err.message.includes('API_KEY'))) {
+      return res.status(401).json({ error: 'Gemini API kalit yaroqsiz. .env faylini tekshiring.' });
     }
     res.status(500).json({ error: 'AI xizmatida xatolik. Qaytadan urinib ko\'ring.' });
   }
@@ -508,7 +649,7 @@ app.post('/api/strategy', async (req, res) => {
   const tender = TENDERS_DB.find(t => t.id === tenderId);
   if (!tender) return res.status(404).json({ error: 'Tender topilmadi' });
 
-  if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-...')) {
+  if (!isGeminiConfigured()) {
     // Fallback: statik strategiya
     return res.json({
       success: true,
@@ -554,13 +695,7 @@ JSON formatda qaytаr:
 }`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 2048,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const rawText = message.content[0].text.trim();
+    const rawText = await geminiGenerate(prompt, null, 'gemini-2.5-flash');
     let parsed;
     try {
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -571,7 +706,7 @@ JSON formatda qaytаr:
 
     res.json({ success: true, aiGenerated: true, strategy: parsed });
   } catch (err) {
-    console.error('Strategy AI error:', err);
+    logger.error('Strategy AI error', err);
     res.json({
       success: true,
       aiGenerated: false,
@@ -594,7 +729,7 @@ function generateFallbackStrategy(tender, company, experience) {
     ],
     steps: [
       { title:"Raqiblarni tahlil qilish", description:`${tender.org} bilan avvalgi shartnomalar, ${tender.competitors} ta raqib kuchli va zaif tomonlari aniqlandi.`, status:'done', tag:'🎯 Tahlil tugadi' },
-      { title:"Optimal narx strategiyasi", description:`Byudjet ${tender.budget} so'm. Optimal taklif narxi: ${formatted} so'm (${Math.round(87)} %).`, status:'done', tag:`💰 ${formatted} so'm tavsiya` },
+      { title:"Optimal narx strategiyasi", description:`Byudjet ${tender.budget} so'm. Optimal taklif narxi: ${formatted} so'm (taxminan byudjetning 87%).`, status:'done', tag:`💰 ${formatted} so'm tavsiya` },
       { title:"Hujjatlarni kuchaytirish", description:"Texnik taklif, moliyaviy hisob va kompaniya profili yuqori sifatda tayyorlanishi kerak. AI generator ishlatish tavsiya etiladi.", status:'active', tag:'📝 Jarayonda' },
       { title:"Taqdimot tayyorlash", description:`${tender.org} oldida 15 daqiqalik taqdimot: texnik imkoniyatlar, avvalgi loyihalar, jamoа.`, status:'pending', tag:`📅 ${daysLeft - 5} kun ichida` },
       { title:"Yuborish va kuzatish", description:`Barcha hujjatni muddatdan 3 kun oldin topshiring. ${tender.contactEmail || 'aloqa'} orqali tasdiq oling.`, status:'pending', tag:'📋 Inson tekshiruvi majburiy' },
@@ -628,18 +763,13 @@ app.post('/api/ai/compare', async (req, res) => {
     }
 
     // If no API key, return demo comparison
-    if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-')) {
+    if (!isGeminiConfigured()) {
       const comparison = generateDemoComparison(t1, t2);
       return res.json({ success: true, comparison, aiGenerated: false, model: 'Demo' });
     }
 
-    // Call Claude AI for comparison
-    const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 1500,
-      messages: [{
-        role: 'user',
-        content: `O'zbek davlat tenderlarini taqqoslab ber.
+    // Call Gemini AI for comparison
+    const comparePrompt = `O'zbek davlat tenderlarini taqqoslab ber.
 
 TENDER 1: "${t1.title}"
 - Byudjet: ${t1.budget}
@@ -657,32 +787,31 @@ TENDER 2: "${t2.title}"
 - Soha: ${t2.soha}
 - Tavsifi: ${t2.description}
 
-Ushbu formatda javob ber JSON:
+Ushbu formatda javob ber JSON (faqat JSON, boshqa hech narsa yo'q):
 {
   "summary": "Qaysi tender yaxshi va nima sababdan",
   "advantages1": ["Tender 1 ning afzalliklari", "..."],
   "advantages2": ["Tender 2 ning afzalliklari", "..."],
-  "risks1": ["Tender 1 ri xavflari", "..."],
-  "risks2": ["Tender 2 ni xavflari", "..."],
+  "risks1": ["Tender 1 xavflari", "..."],
+  "risks2": ["Tender 2 xavflari", "..."],
   "recommendation": "Qaysi tenderni tanlash kerak va nima sababdan",
   "difficulty": "Oson/O'rta/Qiyin",
   "timeToBid": "Hujjatlar tayyorlash uchun taxminiy vaqt kun hisobida"
-}`,
-      }],
-    });
+}`;
+
+    const responseText = await geminiGenerate(comparePrompt, null, 'gemini-2.5-flash');
 
     let comparison;
     try {
-      const responseText = message.content[0].text;
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       comparison = jsonMatch ? JSON.parse(jsonMatch[0]) : generateDemoComparison(t1, t2);
     } catch {
       comparison = generateDemoComparison(t1, t2);
     }
 
-    res.json({ success: true, comparison, aiGenerated: true, model: 'Claude 3.5 Sonnet' });
+    res.json({ success: true, comparison, aiGenerated: true, model: 'Gemini 1.5 Flash' });
   } catch (err) {
-    console.error('Compare error:', err.message);
+    logger.error('Compare error', err);
     res.status(500).json({ error: 'AI taqqoslashda xatolik' });
   }
 });
@@ -710,8 +839,8 @@ function generateDemoComparison(t1, t2) {
       `${new Intl.NumberFormat('uz').format(t2.budgetRaw)} so'm byudjet`,
       `${t2.tags.join(', ')} sohalari`
     ],
-    risks1: daysLeft1 < 15 ? ["Muddati tez tugaydi - shoshqoq hujjatlar"] : ["Muddatga ${daysLeft1} kun qoldi"],
-    risks2: daysLeft2 < 15 ? ["Muddati tez tugaydi - shoshqoq hujjatlar"] : ["Muddatga ${daysLeft2} kun qoldi"],
+    risks1: daysLeft1 < 15 ? ['Muddati tez tugaydi — shoshilinch hujjatlar'] : [`Muddatga ${daysLeft1} kun qoldi`],
+    risks2: daysLeft2 < 15 ? ['Muddati tez tugaydi — shoshilinch hujjatlar'] : [`Muddatga ${daysLeft2} kun qoldi`],
     recommendation: t1Stronger 
       ? `${t1.title.substring(0, 50)}... ni tanlang. Yuqori g'alaba ehtimoli va ko'proq vaqt mavjud.` 
       : `${t2.title.substring(0, 50)}... ni tanlang. Yuqori g'alaba ehtimoli va ko'proq vaqt mavjud.`,
@@ -721,32 +850,63 @@ function generateDemoComparison(t1, t2) {
 }
 
 // ── AUTH ROUTES ──────────────────────────────────────────────────────
-app.post('/api/auth/register', async (req, res) => {
+const authRegisterSanitize = sanitizeBody({ name: 'name', company: 'company' });
+const registerRules = {
+  name: { required: true, format: 'name', errorMsg: 'Ism 2–50 belgi, ruxsat etilgan alifbo' },
+  phone: { required: true, format: 'phone', errorMsg: 'Telefon +998901234567 yoki 901234567 ko\'rinishida kiriting' },
+  password: { required: true, format: 'password', errorMsg: 'Parol kamida 6 belgi, bo\'shliqsiz' },
+  company: { required: false, format: 'company', errorMsg: 'Kompaniya nomi 2–100 belgi' },
+};
+const loginRules = {
+  phone: { required: true, format: 'phone', errorMsg: 'Telefon formati noto\'g\'ri' },
+  password: { required: true, format: 'password', errorMsg: 'Parol noto\'g\'ri' },
+};
+
+function normalizeAuthPhone(req, res, next) {
+  req.body.phone = normalizeUzbekPhone(req.body.phone || '');
+  next();
+}
+
+function phonesMatch(stored, normalizedInput) {
+  if (!stored || !normalizedInput) return false;
+  if (stored === normalizedInput) return true;
+  return normalizeUzbekPhone(String(stored)) === normalizedInput;
+}
+
+function findUserByPhone(db, normalizedPhone) {
+  return db.users.find(u => phonesMatch(u.phone, normalizedPhone));
+}
+
+app.post('/api/auth/register',
+  authRegisterSanitize,
+  normalizeAuthPhone,
+  validateBody(registerRules),
+  async (req, res) => {
   const { name, phone, password, company } = req.body;
-  if (!name || !phone || !password) {
-    return res.status(400).json({ error: 'Ism, telefon va parol talab qilinadi' });
-  }
 
   const db = readDB();
-  if (db.users.find(u => u.phone === phone)) {
+  if (findUserByPhone(db, phone)) {
     return res.status(409).json({ error: 'Bu telefon raqam allaqachon ro\'yxatdan o\'tgan' });
   }
 
   const hashedPwd = await bcrypt.hash(password, 10);
   const user = { id: uuidv4(), name, phone, company: company || '', password: hashedPwd, createdAt: new Date().toISOString() };
   db.users.push(user);
-  writeDB(db);
+  // XATO #8 TUZATMA: xavfsiz yozish funksiyasidan foydalanish
+  await writeDBSafe(db);
 
   const token = jwt.sign({ id: user.id, name: user.name, phone: user.phone }, JWT_SECRET, { expiresIn: '30d' });
   res.status(201).json({ success: true, token, user: { id: user.id, name: user.name, phone: user.phone, company: user.company } });
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login',
+  normalizeAuthPhone,
+  validateBody(loginRules),
+  async (req, res) => {
   const { phone, password } = req.body;
-  if (!phone || !password) return res.status(400).json({ error: 'telefon va parol talab qilinadi' });
 
   const db = readDB();
-  const user = db.users.find(u => u.phone === phone);
+  const user = findUserByPhone(db, phone);
   if (!user) return res.status(401).json({ error: 'Telefon yoki parol noto\'g\'ri' });
 
   const ok = await bcrypt.compare(password, user.password);
@@ -771,7 +931,7 @@ app.get('/api/saved', authMiddleware, (req, res) => {
   res.json(tenders);
 });
 
-app.post('/api/saved/:id', authMiddleware, (req, res) => {
+app.post('/api/saved/:id', authMiddleware, async (req, res) => {
   const db = readDB();
   const userId = req.user.id;
   if (!db.savedTenders[userId]) db.savedTenders[userId] = [];
@@ -779,11 +939,12 @@ app.post('/api/saved/:id', authMiddleware, (req, res) => {
   const idx = db.savedTenders[userId].indexOf(req.params.id);
   if (idx > -1) {
     db.savedTenders[userId].splice(idx, 1);
-    writeDB(db);
+    // XATO #8 TUZATMA: xavfsiz yozish
+    await writeDBSafe(db);
     res.json({ saved: false, message: 'Saqlangan tenderlardan olib tashlandi' });
   } else {
     db.savedTenders[userId].push(req.params.id);
-    writeDB(db);
+    await writeDBSafe(db);
     res.json({ saved: true, message: 'Tender saqlandi!' });
   }
 });
@@ -796,7 +957,7 @@ app.get('/api/won', authMiddleware, (req, res) => {
   res.json(tenders);
 });
 
-app.post('/api/won/:id', authMiddleware, (req, res) => {
+app.post('/api/won/:id', authMiddleware, async (req, res) => {
   const db = readDB();
   const userId = req.user.id;
   if (!db.wonTenders[userId]) db.wonTenders[userId] = [];
@@ -804,13 +965,87 @@ app.post('/api/won/:id', authMiddleware, (req, res) => {
   const idx = db.wonTenders[userId].indexOf(req.params.id);
   if (idx > -1) {
     db.wonTenders[userId].splice(idx, 1);
-    writeDB(db);
+    // XATO #8 TUZATMA: xavfsiz yozish
+    await writeDBSafe(db);
     res.json({ won: false, message: 'Yutganlardan olib tashlandi' });
   } else {
     db.wonTenders[userId].push(req.params.id);
-    writeDB(db);
+    await writeDBSafe(db);
     res.json({ won: true, message: "Tabriklaymiz! Tender yutilganlar safiga qo'shildi 🏆" });
   }
+});
+
+// QO'SHIMCHA #5: Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    version: '2.0.0',
+    timestamp: new Date().toISOString(),
+    ai: isGeminiConfigured() ? 'gemini-configured' : 'not_configured',
+    db: fs.existsSync(DB_FILE) ? 'ok' : 'missing'
+  });
+});
+
+// QO'SHIMCHA #3: Parolni o'zgartirish endpoint
+app.put('/api/auth/change-password', authMiddleware, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  // Maydonlar to'liqligini tekshirish
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Hamma maydonlar talab qilinadi' });
+  }
+  // Yangi parol uzunligi va bo'shliq tekshiruvi
+  if (newPassword.length < 6 || /\s/.test(newPassword)) {
+    return res.status(400).json({ error: 'Yangi parol kamida 6 belgi, bo\'shliqsiz' });
+  }
+  // Yangi va eski parol mos kelmasa
+  if (currentPassword === newPassword) {
+    return res.status(400).json({ error: 'Yangi parol eski paroldan farq qilishi kerak' });
+  }
+
+  const db = readDB();
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+
+  // Joriy parolni solishtirish
+  const ok = await bcrypt.compare(currentPassword, user.password);
+  if (!ok) return res.status(401).json({ error: 'Joriy parol noto\'g\'ri' });
+
+  // Yangi parolni hash qilib saqlash
+  user.password = await bcrypt.hash(newPassword, 10);
+  user.passwordChangedAt = new Date().toISOString();
+  await writeDBSafe(db);
+
+  res.json({ success: true, message: 'Parol muvaffaqiyatli o\'zgartirildi' });
+});
+
+// QO'SHIMCHA #4: Profil yangilash endpoint
+app.put('/api/auth/profile', authMiddleware, async (req, res) => {
+  const { name, company } = req.body;
+
+  // Ism uzunligini tekshirish
+  if (name && (name.length < 2 || name.length > 50)) {
+    return res.status(400).json({ error: 'Ism 2-50 belgi bo\'lishi kerak' });
+  }
+  // Kompaniya uzunligini tekshirish
+  if (company && company.length > 100) {
+    return res.status(400).json({ error: 'Kompaniya nomi 100 belgidan oshmasin' });
+  }
+
+  const db = readDB();
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+
+  // Faqat yuborilgan maydonlarni yangilash
+  if (name) user.name = name.trim();
+  if (company !== undefined) user.company = company.trim();
+  user.updatedAt = new Date().toISOString();
+  await writeDBSafe(db);
+
+  res.json({
+    success: true,
+    user: { id: user.id, name: user.name, phone: user.phone, company: user.company }
+  });
 });
 
 // ── EXPORT ENDPOINTS ─────────────────────────────────────────────────
@@ -821,7 +1056,8 @@ app.post('/api/export/word', (req, res) => {
   
   if (!docs && !content) return res.status(400).json({ error: 'No content' });
   
-  const { Document, Packer, Paragraph, TextRun, PageBreak } = docx;
+  // XATO #2 TUZATMA: PageBreak docx v9.x da mavjud emas — pageBreakBefore ishlatiladi
+  const { Document, Packer, Paragraph, TextRun } = docx;
   
   let children = [];
   
@@ -840,19 +1076,20 @@ app.post('/api/export/word', (req, res) => {
     
     docOrder.forEach((docType, idx) => {
       if (docs[docType]) {
-        // Add page break before each document (except first)
+        // XATO #2 TUZATMA: pageBreakBefore ishlatiladi (PageBreak mavjud emas docx v9.x da)
         if (idx > 0) {
-          children.push(new PageBreak());
+          children.push(new Paragraph({ pageBreakBefore: true, children: [] }));
         }
         
-        // Add document title
+        // XATO #5 TUZATMA: Sarlavha rangi — professional to'q ko'k-kulrang (1F2937)
+        // Oldin: C8FF00 (neon yashil — chop etishda ko'rinmaydi)
         children.push(new Paragraph({
-          children: [new TextRun({ text: docNames[docType] || docType, bold: true, size: 28, font: 'Cambria', color: 'C8FF00' })],
+          children: [new TextRun({ text: docNames[docType] || docType, bold: true, size: 28, font: 'Cambria', color: '1F2937' })],
           spacing: { after: 200 }
         }));
         
         // Add document content
-        const lines = docs[docType].split('\\n');
+        const lines = splitDocLines(docs[docType]);
         lines.forEach(line => {
           children.push(new Paragraph({
             children: [new TextRun({ text: line || ' ', size: 22, font: 'Cambria' })],
@@ -863,7 +1100,7 @@ app.post('/api/export/word', (req, res) => {
     });
   } else if (content) {
     // Fallback for single document format
-    const paragraphs = content.split('\\n').map(line => {
+    const paragraphs = splitDocLines(content).map(line => {
       return new Paragraph({
         children: [new TextRun({ text: line, size: 24, font: 'Cambria' })],
         spacing: { after: 120 }
@@ -890,7 +1127,7 @@ app.post('/api/export/word', (req, res) => {
   });
 
   Packer.toBuffer(doc).then((buffer) => {
-    res.setHeader('Content-Disposition', `attachment; filename="${(title || 'Hujjat').replace(/\\s+/g,'_')}.docx"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${(title || 'Hujjat').replace(/\s+/g, '_')}.docx"`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.send(buffer);
   }).catch(e => res.status(500).json({ error: e.message }));
@@ -902,7 +1139,7 @@ app.post('/api/export/pdf', (req, res) => {
 
   const pdf = new PDFDocument({ margin: 40, bufferPages: true });
   
-  res.setHeader('Content-Disposition', `attachment; filename="${(title || 'Hujjat').replace(/\\s+/g,'_')}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${(title || 'Hujjat').replace(/\s+/g, '_')}.pdf"`);
   res.setHeader('Content-Type', 'application/pdf');
   
   pdf.pipe(res);
@@ -938,7 +1175,7 @@ app.post('/api/export/pdf', (req, res) => {
         
         // Document content
         pdf.fontSize(10).font('Helvetica');
-        const lines = docs[docType].split('\\n');
+        const lines = splitDocLines(docs[docType]);
         lines.forEach(line => {
           pdf.text(line || '', { align: 'justify', lineGap: 2 });
         });
@@ -954,54 +1191,73 @@ app.post('/api/export/pdf', (req, res) => {
   pdf.end();
 });
 
-// ── AI CHAT (Maslahatchi) ────────────────────────────────────────────
-app.use('/api/chat', aiLimiter);
+// ── AI CHAT (Maslahatchi) — alohida limit, chuqur suhbat ─────────────
+app.use('/api/chat', chatLimiter);
+
+function sanitizeChatHistoryTurns(history) {
+  if (!Array.isArray(history)) return [];
+  const out = [];
+  for (const h of history) {
+    if (!h || (h.role !== 'user' && h.role !== 'assistant')) continue;
+    if (typeof h.content !== 'string') continue;
+    const c = h.content.trim();
+    if (!c || c.length > 12000) continue;
+    const last = out[out.length - 1];
+    if (last && last.role === h.role) {
+      last.content += `\n\n${c}`;
+    } else {
+      out.push({ role: h.role, content: c });
+    }
+  }
+  while (out.length && out[0].role === 'assistant') out.shift();
+  return out.slice(-24);
+}
+
 app.post('/api/chat', async (req, res) => {
   const { message, tenderContext, history } = req.body;
-  if (!message) return res.status(400).json({ error: 'Xabar talab qilinadi' });
+  if (!message || typeof message !== 'string') return res.status(400).json({ error: 'Xabar talab qilinadi' });
+  if (message.length > 8000) return res.status(400).json({ error: 'Xabar 8000 belgidan oshmasin' });
 
-  // Build system prompt — the AI is an expert Uzbekistan tender consultant
-  const systemPrompt = `Sen "TenderMind AI Maslahatchi" — O'zbekiston davlat xaridlari (tender) sohasining eng tajribali mutaxassisisan.
+  const tenderCount = TENDERS_DB.length;
+  const systemPrompt = `Sen "TenderMind AI Maslahatchi"san — xatti-harakating ChatGPT yoki Claude kabi tabiiy, do'stona va suhbatga asoslangan bo'lsin, lekin ixtisoslashuving — O'zbekiston va umuman davlat xaridlari, tenderlar, kotirovkalar, shartnomalar va xarid jarayoni.
 
-SENING VAZIFALARING:
-1. Foydalanuvchiga qaysi tenderda qatnashish kerakligini maslahat berish
-2. Tender g'alaba strategiyasini tushuntirish
-3. Hujjatlar tayyorlashda yordam berish
-4. Narx strategiyasi bo'yicha maslahat berish
-5. Raqiblarni tahlil qilish bo'yicha ko'rsatma berish
-6. Xarid.uz portali qoidalari va qonunchilikni tushuntirish
+ASOSIY PRINSIPLAR:
+1) Har qanday savolga javob ber: tushuntirish, taqqoslash, misollar, "boshlang'ich uchun" qo'llanma, professional maslahat — hammasi mumkin.
+2) Foydalanuvchi "tushunmayman", "nima bu tender?", "ma'lumot bermang, oddiy tilda tushuntiring" desa — juda sodda va bosqichma-bosqich tushuntir, jargonni yana ochib ber.
+3) Suhbat tarixini hisobga ol: avvalgi xabarlarga mantiqiylik bilan bog'la, takrorlamasdan davom ettir.
+4) Til: foydalanuvchi o'zbekcha yozsa — asosan o'zbekcha; ruscha/inglizcha yozsa — shu tilda javob ber (kerak bo'lsa ikkala tilni aralashtirish mumkin).
+5) Javob uzunligi: savolga mos. Oddiy savolga qisqa; "tushuntirib ber", "batafsil" desa — batafsil yozish mumkin (bir necha bo'lim, ro'yxamlar).
+6) Format: **qalin** uchun markdown, ro'yxamlar, qisqa sarlavhalar — o'qish oson bo'lsin.
+7) TenderMind ilovasidagi tenderlar — o'qitish/demonstratsiya uchun namunaviy ma'lumotlar (${tenderCount} ta yozuv). Ularni haqiqiy xarid.uz e'lonlari bilan aralashtirmasdan, kerak bo'lsa "bu yerda demo ma'lumot" deb aytaver.
+8) Qonuniy va axloqiy: soliq, korrupsiya, yolg'on hujjat yoki qoidabuzarlikni o'rganishni so'rasa — rad qilib, qonuniy yo'lni tavsiya qil.
+9) Aniq qonun bandi yoki portal qoidasi ishonchsiz bo'lsa — "rasmiy manba yoki yurist bilan tekshiring" deb yoz.
+10) Yopishda ba'zan 1 ta qo'shimcha savol taklif qil (majburiy emas, suhbat tabiiy bo'lsa — qo'shmasdan ham bo'ladi).
 
-QOIDALAR:
-- Har doim o'zbek tilida javob ber (foydalanuvchi boshqa tilda yozsa ham)
-- Javoblarni qisqa, aniq va amaliy qilib ber
-- Raqamlar va faktlar ishlatganda iloji boricha haqiqiy O'zbekiston kontekstida bo'lsin
-- Agar tender konteksti berilgan bo'lsa, o'sha tender haqida batafsil maslahat ber
-- Har doim ethical va qonuniy maslahatlar ber
-- Javob oxirida 1-2 ta qo'shimcha savol taklif qil (foydalanuvchi davom ettirishi uchun)
-
-Hozirgi bazada mavjud tenderlar sohalari: IT, Qurilish, Tibbiyot, Oziq-ovqat, Transport, Ta'lim, Ekologiya, Qishloq xo'jaligi.
-Hududlar: Toshkent, Samarqand, Namangan, Andijon, Farg'ona, Buxoro, Qashqadaryo, Xorazm, Surxondaryo.`;
+KONTEKST (yordamchi):
+- O'zbekistonda davlat xaridlari odatda elektron platformalar orqali; fuqarolarga "tender" — davlat yoki tashkilot xarid qilish uchun ochiq tanlov jarayoni sifatida tushuntiriladi.
+- Sohalar: IT, qurilish, tibbiyot, oziq-ovqat, transport, ta'lim, ekologiya, qishloq xo'jaligi va boshqalar.
+- Hududlar (demo): Toshkent, Samarqand, Namangan, Andijon, Farg'ona, Buxoro, Qashqadaryo, Xorazm, Surxondaryo.`;
 
   let contextInfo = '';
   if (tenderContext) {
     const tender = TENDERS_DB.find(t => t.id === tenderContext);
     if (tender) {
-      contextInfo = `\n\n[JORIY TENDER KONTEKSTI]
+      contextInfo = `\n\n[FOYDALANUVCHI TANLAGAN TENDER (demo bazadan)]
+ID: ${tender.id}
 Nomi: ${tender.title}
 Tashkilot: ${tender.org}
 Soha: ${tender.soha}
 Hudud: ${tender.hudud}
 Byudjet: ${tender.budget} so'm
-Raqiblar: ${tender.competitors} ta
-G'alaba ehtimoli: ${tender.probability}%
+Raqiblar (demo): ${tender.competitors} ta
+G'alaba ehtimoli (demo model): ${tender.probability}%
 Muddat: ${tender.deadline}
 Talablar: ${(tender.requirements || []).join(', ')}
 Tavsif: ${tender.description || ''}`;
     }
   }
 
-  // If no API key, return a smart fallback
-  if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-...')) {
+  if (!isGeminiConfigured()) {
     return res.json({
       success: true,
       aiGenerated: false,
@@ -1009,27 +1265,28 @@ Tavsif: ${tender.description || ''}`;
     });
   }
 
+  const pastTurns = sanitizeChatHistoryTurns(history);
+
+  // Gemini chat history formatiga o'tkazish
+  const geminiHistory = pastTurns.map(h => ({
+    role: h.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: h.content }],
+  }));
+
+  const userMessageWithContext = message.trim() + contextInfo;
+
   try {
-    // Build messages array with history
-    const messages = [];
-    if (history && Array.isArray(history)) {
-      history.slice(-10).forEach(h => {
-        messages.push({ role: h.role, content: h.content });
-      });
-    }
-    messages.push({ role: 'user', content: message + contextInfo });
-
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 1500,
-      system: systemPrompt,
-      messages: messages,
-    });
-
-    const reply = response.content[0].text.trim();
-    res.json({ success: true, aiGenerated: true, reply });
+    const reply = await geminiChat(systemPrompt, geminiHistory, userMessageWithContext);
+    res.json({ success: true, aiGenerated: true, reply: reply.trim() });
   } catch (err) {
-    console.error('Chat AI error:', err);
+    logger.error('Chat AI error', err);
+    // Fallback: gemini-pro bilan urinib ko'r
+    try {
+      const reply = await geminiChat(systemPrompt, [], userMessageWithContext);
+      return res.json({ success: true, aiGenerated: true, reply: reply.trim() });
+    } catch (err2) {
+      logger.error('Chat AI fallback error', err2);
+    }
     res.json({
       success: true,
       aiGenerated: false,
@@ -1039,75 +1296,110 @@ Tavsif: ${tender.description || ''}`;
 });
 
 function generateFallbackChatReply(message, tenderContext) {
-  const msg = message.toLowerCase();
+  const msg = message.toLowerCase().trim();
+
+  const beginnerHints =
+    /tushunmay|tushunmadim|nima (bu )?tender|tender nima|boshlang|yangiman|oddiy tilda|tushunti|nimaga kerak|nimala|qanday (ish|bo)/.test(msg);
+  if (beginnerHints && !tenderContext) {
+    return (
+      '**Tender nima?** (qisqa va oddiy)\n\n' +
+      'Davlat yoki yirik tashkilot nimadir sotib olishi kerak bo\'lsa (masalan, kompyuter, qurilish ishlari, oziq-ovqat xizmati), ' +
+      'ko\'pincha buni **ochiq tanlov** orqali qiladi: bir necha kompaniya **taklif** beradi, eng mosini tanlaydi. Shu jarayonning o\'zi ko\'pincha **tender** deb ataladi.\n\n' +
+      '**Asosiy g\'oya:**\n' +
+      '• **Buyurtmachi** — kim xarid qilmoqchi\n' +
+      '• **Ishtirokchi** — kim xizmat/yetkazib berishni taklif qiladi\n' +
+      '• **Hujjatlar** — nima qila olishingiz va qancha narxlash haqida\n' +
+      '• **Muddat** — qachongacha topshirish kerak\n\n' +
+      '**TenderMind** ilovasidagi ro\'yxat — **o\'rganish uchun demo** tenderlar; haqiqiy e\'lonlar uchun rasmiy **xarid.uz** (va tegishli) portallarni tekshiring.\n\n' +
+      'Hozir **API kaliti yo\'q** — men to\'liq suhbat rejimida emasman. To\'liq "ChatGPT kabi" javoblar uchun `.env` ga `ANTHROPIC_API_KEY` qo\'shing.\n\n' +
+      'Keyingi qadam sifatida yozing: "Qanday hujjatlar kerak?" yoki "Narxni qanday belgilash mumkin?" — yoki ilovadan bitta tenderni tanlab **AI dan maslahat** qiling.'
+    );
+  }
 
   if (tenderContext) {
     const tender = TENDERS_DB.find(t => t.id === tenderContext);
     if (tender) {
-      return `📊 "${tender.title}" tenderi haqida maslahat:\n\n` +
-        `✅ G'alaba ehtimoli: ${tender.probability}% — ${tender.probability >= 70 ? 'Yuqori imkoniyat!' : tender.probability >= 50 ? "O'rtacha, yaxshi tayyorgarlik kerak" : 'Raqobat kuchli, kuchli taklif zarur'}.\n\n` +
-        `💰 Byudjet: ${tender.budget} so'm. Optimal taklif narxi — byudjetning 85-92% atrofida bo'lishi tavsiya etiladi.\n\n` +
-        `⚔️ Raqiblar: ${tender.competitors} ta. ${tender.competitors <= 4 ? 'Kam raqib — bu sizning afzalligingiz!' : "Ko'p raqib — texnik ustunlikka e'tibor bering"}.\n\n` +
-        `📋 Strategiya:\n1. Texnik taklifni batafsil va sifatli tayyorlang\n2. Narxni ${Math.round(tender.budgetRaw * 0.88 / 1e6)} mln so'm atrofida belgilang\n3. ISO sertifikatlaringizni ko'rsating\n4. Avvalgi muvaffaqiyatli loyihalaringiz haqida yozing\n\n` +
-        `❓ Yana qanday savollaringiz bor? Masalan:\n• "Hujjatlarni qanday tayyorlash kerak?"\n• "Narx strategiyasini tushuntirib bering"`;
+      return `**"${tender.title}"** (tanlangan tender, demo ma'lumot)\n\n` +
+        `**Kim e'lon qilgan:** ${tender.org}\n` +
+        `**Nima haqida:** ${tender.description || 'Tavsif ilovada'}\n\n` +
+        `**Byudjet (demo):** ${tender.budget} so'm\n` +
+        `**G'alaba ehtimoli (demo model):** ${tender.probability}%\n` +
+        `**Taxminiy raqiblar soni (demo):** ${tender.competitors}\n` +
+        `**Muddat:** ${tender.deadline}\n\n` +
+        `**Talablar:** ${(tender.requirements || []).join('; ') || '—'}\n\n` +
+        `**Amaliy maslahat:** texnik taklifni batafsil yozing, narxni odatda byudjetning **85–92%** atrofida rejalashtirish ko'p hollarda mantiqiy; hujjatlarni muddatdan oldin topshiring.\n\n` +
+        (isAnthropicConfigured()
+          ? ''
+          : '_To\'liq batafsil suhbat uchun API kalitini ulang._\n\n') +
+        `Yana nimani tushuntirish kerak — narx, hujjatlar yoki strategiya?`;
     }
   }
 
+  if (/salom|assalom|hello|hi\b|privet/.test(msg)) {
+    return (
+      'Salom! Men TenderMind **AI maslahatchi**man (hozir cheklangan rejim: API kalitsiz shablon javoblar).\n\n' +
+      'Menga **har qanday** tender haqida savol bering — masalan:\n' +
+      '• "Tender va oddiy xarid farqi nima?"\n' +
+      '• "Birinchi marta qatnashmoqchiman, nimadan boshlayman?"\n' +
+      '• "Texnik taklifda nima bo\'lishi kerak?"\n\n' +
+      'Haqiqiy suhbat va chuqur javoblar uchun loyihada **ANTHROPIC_API_KEY** sozlansin.'
+    );
+  }
+
+  if (/xarid\.uz|xarid uz|portal/.test(msg)) {
+    return (
+      '**xarid.uz** — O\'zbekistonda davlat xaridlari bilan bog\'liq elektron tizimlardan biri (rasmiy portal va qoidalar vaqt o\'tishi bilan yangilanadi).\n\n' +
+      'Umuman olganda u yerda **e\'lonlar**, **hujjatlar**, **muddatlar** va **taklif topshirish** bo\'yicha yo\'riqnomalar bo\'ladi. Aniq qadam-qadam uchun portalning o\'zidagi **yordam** yoki yurist bilan tekshirish yaxshi.\n\n' +
+      'TenderMind esa **o\'qitish va tayyorgarlik** uchun: demo tenderlar, strategiya va hujjat namunalari.'
+    );
+  }
+
   if (msg.includes('tender') && (msg.includes('qaysi') || msg.includes('mos') || msg.includes('tavsiya'))) {
-    return `🎯 Sizga mos tender topish uchun bir necha savol:\n\n` +
-      `1. Kompaniyangiz qaysi sohada ishlaydi? (IT, Qurilish, Tibbiyot, Oziq-ovqat, Transport, Ta'lim, Ekologiya, Qishloq xo'jaligi)\n` +
-      `2. Necha yillik tajribangiz bor?\n` +
-      `3. Qaysi hududda ishlashni xohlaysiz?\n\n` +
-      `Bu ma'lumotlar asosida men sizga eng mos tenderlarni tavsiya qilaman! 📊\n\n` +
-      `💡 Maslahat: "AI Tavsiya" tugmasini bosing — avtomatik tahlil qilinadi.`;
+    return `**Mos tender** topish uchun o'zingiz haqingizda qisqacha ayting yoki ilovada **🤖 AI Tavsiya** tugmasidan foydalaning.\n\n` +
+      `Savollar:\n` +
+      `1. Qaysi sohada ishlaysiz? (IT, qurilish, tibbiyot, ...)\n` +
+      `2. Tajribangiz necha yil?\n` +
+      `3. Qaysi viloyat/shahar?\n\n` +
+      `_API ulangan bo'lsa, men bularni inobatga olib batafsil javob beraman._`;
   }
 
   if (msg.includes('narx') || msg.includes('baho') || msg.includes('qancha') || msg.includes('price')) {
-    return `💰 Tender narx strategiyasi:\n\n` +
-      `1. **Optimal narx diapazoni**: Byudjetning 82-92% oralig'ida narx taklif qiling\n` +
-      `2. **Eng past narx**: Har doim g'alaba keltirmaydi! Sifat va tajriba ham baholanadi\n` +
-      `3. **Xarajatlar tarkibi**:\n   • Materiallar: 35-45%\n   • Ish haqi: 20-30%\n   • Transport: 8-12%\n   • Boshqaruv: 5-8%\n   • Foyda: 8-12%\n\n` +
-      `⚠️ Eslatma: Juda past narx shubha tug'diradi va rad etilishi mumkin.\n\n` +
-      `❓ Konkret tender uchun narx hisoblashni xohlaysizmi? Tender nomini aytib bering.`;
+    return `**Narx bo'yicha (umumiy)**\n\n` +
+      `• Ko'p hollarda taklif **byudjetdan past** bo'ladi; juda ham past bo'lsa, ishonchlilik shubhasi tug'ilishi mumkin.\n` +
+      `• **Texnik qism** va **tajriba** ham baholanadi — faqat eng arzon emas.\n` +
+      `• Smetada **xarajat turlari** (materiallar, mehnat, transport, boshqaruv, rezerv) ko'rinadigan qilib yozish yaxshi.\n\n` +
+      `Konkret tender byudjetini aytsangiz, taxminiy diapazon haqida gaplashamiz (to'liq rejimda API kalit kerak).`;
   }
 
   if (msg.includes('hujjat') || msg.includes('document') || msg.includes('tayyorl')) {
-    return `📝 Tender hujjatlari ro'yxati:\n\n` +
-      `**Majburiy hujjatlar:**\n` +
-      `1. ✅ Texnik taklif — loyihani qanday amalga oshirasiz\n` +
-      `2. ✅ Moliyaviy taklif — narx va smeta\n` +
-      `3. ✅ Kompaniya profili — tajriba va imkoniyatlar\n` +
-      `4. ✅ Guvohnomalar — STIR, litsenziyalar\n\n` +
-      `**Qo'shimcha ustunlik beruvchi hujjatlar:**\n` +
-      `• ISO sertifikatlari (9001, 14001, 27001)\n` +
-      `• Avvalgi loyihalar dalolatnomalari\n` +
-      `• Bank kafolat xati\n` +
-      `• Xodimlar malaka hujjatlari\n\n` +
-      `💡 "Hujjat" tabiga o'ting — AI 8 soniyada texnik, moliyaviy va profil hujjatlarini tayyorlab beradi!\n\n` +
-      `❓ Qaysi hujjat haqida batafsil bilmoqchisiz?`;
+    return `**Odatda so'raladigan hujjatlar**\n\n` +
+      `• **Texnik taklif** — bajarish usuli, muddat, sifat\n` +
+      `• **Moliyaviy / narx taklifi**\n` +
+      `• **Kompaniya to'g'risida** — guvohnomalar, tajriba\n` +
+      `• **Litsenziya / sertifikat** (soha bo'yicha)\n\n` +
+      `TenderMind **Hujjat** bo'limida AI yordamida namunalar yaratish mumkin — lekin yuborishdan oldin **o'zingiz tekshiring**.\n\n` +
+      `API kalitsiz men faqat umumiy ro'yxatni beraman; batafsil matn uchun kalitni ulang.`;
   }
 
   if (msg.includes('strategiya') || msg.includes('g\'alaba') || msg.includes('yutish') || msg.includes('win')) {
-    return `🏆 Tenderni yutish strategiyasi:\n\n` +
-      `**5 ta asosiy qadam:**\n\n` +
-      `1️⃣ **Tahlil**: Raqiblarni o'rganing, ularning avvalgi tenderlarini ko'ring\n` +
-      `2️⃣ **Narx**: Byudjetning 85-90% atrofida optimal narx belgilang\n` +
-      `3️⃣ **Hujjat**: Texnik taklifni batafsil va professional tayyorlang\n` +
-      `4️⃣ **Tajriba**: O'xshash loyihalaringizni ko'rsating (referenslar)\n` +
-      `5️⃣ **Muddat**: Hujjatlarni muddatdan 2-3 kun oldin topshiring\n\n` +
-      `📊 Statistika: Yaxshi tayyorgarlik ko'rgan kompaniyalar 73% ko'proq g'alaba qozonadi!\n\n` +
-      `❓ Konkret tender uchun strategiya olmoqchimisiz? Tender tanlang.`;
+    return `**G'alaba uchun umumiy yo'nalish**\n\n` +
+      `1. E'lon va **texnik topshiriq**ni diqqat bilan o'qing\n` +
+      `2. **Raqobatchilar** va bozor narxini taxminan bilib oling\n` +
+      `3. **Texnik taklif**ni aniq va ishonchli qiling\n` +
+      `4. **Muddat va hujjatlar**ni oldin topshirish\n` +
+      `5. Shubhali joylarda rasmiy **savol-javob** kanalidan foydalanish\n\n` +
+      `Ilovada aniq tenderni tanlab **Strategiya** va **taqqoslash** funksiyalaridan ham foydalaning.`;
   }
 
-  // Default response
-  return `👋 Salom! Men TenderMind AI Maslahatchi — tender bo'yicha ekspertman.\n\nMen sizga quyidagilarda yordam bera olaman:\n\n` +
-    `🔍 **Tender tanlash** — "Menga mos tender tavsiya qil"\n` +
-    `💰 **Narx strategiyasi** — "Qancha narx taklif qilish kerak?"\n` +
-    `📝 **Hujjat tayyorlash** — "Qanday hujjatlar kerak?"\n` +
-    `🏆 **G'alaba strategiyasi** — "Tenderni qanday yutish mumkin?"\n` +
-    `📊 **Raqiblar tahlili** — "Raqiblarni qanday o'rganish kerak?"\n\n` +
-    `Savolingizni yozing yoki tenderlar ro'yxatidan biror tenderni tanlang — men o'sha tender haqida batafsil maslahat beraman! 🤖\n\n` +
-    `❓ Masalan: "IT sohasida qaysi tender yaxshi?" yoki "Tenderni yutish uchun nima qilish kerak?"`;
+  return (
+    'Men **tender va davlat xaridlari** bo\'yicha yordam berishga mo\'ljallanganman. Hozir **Gemini API** ulangan emas, shuning uchun javoblarim **cheklangan shablon** asosida.\n\n' +
+    '**Siz yozishingiz mumkin:**\n' +
+    '• "Tender nima va qanday ishlaydi?"\n' +
+    '• "Boshlang\'ich uchun qadam-baqadam tushuntir"\n' +
+    '• "Narx, hujjat, strategiya haqida maslahat"\n\n' +
+    '**To\'liq erkin suhbat** uchun loyiha ildizida `.env` faylida `GEMINI_API_KEY=...` qo\'ying va serverni qayta ishga tushiring.\n\n' +
+    `Savolingiz: _"${message.slice(0, 200)}${message.length > 200 ? '…' : ''}"_ — yuqoridagi mavzulardan birini tanlang yoki savolni aniqroq yozing.`
+  );
 }
 
 // ── AI TENDER RECOMMENDATION ────────────────────────────────────────
@@ -1124,7 +1416,7 @@ app.post('/api/ai/recommend', async (req, res) => {
   candidates.sort((a, b) => b.probability - a.probability);
   const top5 = candidates.slice(0, 5);
 
-  if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-...')) {
+  if (!isGeminiConfigured()) {
     // Fallback: return smart recommendations without AI
     const recommendations = top5.map(t => {
       const daysLeft = Math.ceil((new Date(t.deadline) - new Date()) / 86400000);
@@ -1185,13 +1477,7 @@ JSON formatda qaytяr (faqat JSON):
 }`;
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 2048,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const rawText = response.content[0].text.trim();
+    const rawText = await geminiGenerate(prompt, null, 'gemini-2.5-flash');
     let parsed;
     try {
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -1217,7 +1503,7 @@ JSON formatda qaytяr (faqat JSON):
 
     res.json({ success: true, aiGenerated: true, ...parsed });
   } catch (err) {
-    console.error('AI recommend error:', err);
+    logger.error('AI recommend error', err);
     // Return fallback
     const recommendations = top5.map(t => ({
       tenderId: t.id, title: t.title, score: t.probability,
@@ -1237,7 +1523,7 @@ app.use((req, res) => {
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  console.error('Server Error:', err.message);
+  logger.error('Server Error', err);
   res.status(err.status || 500).json({
     error: err.message || 'Server xatosi',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
@@ -1245,8 +1531,50 @@ app.use((err, req, res, next) => {
 });
 
 // ── START ────────────────────────────────────────────────────────────
+
+// QO'SHIMCHA #9: Startup validatsiya — muhim konfiguratsiyalarni tekshirish
+function validateStartupConfig() {
+  const warnings = [];
+  const errors = [];
+
+  // API kalit tekshiruvi
+  if (!isGeminiConfigured()) {
+    warnings.push('GEMINI_API_KEY sozlanmagan — AI funksiyalar ishlamaydi');
+  }
+  // JWT Secret tekshiruvi
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'tendermind-super-secret-key-change-in-production') {
+    if (isProd) errors.push('JWT_SECRET almashtirilmagan — XAVFLI!');
+    else warnings.push('JWT_SECRET standart qiymatda — productiondan oldin o\'zgartiring');
+  }
+  // NODE_ENV tekshiruvi
+  if (!process.env.NODE_ENV) {
+    warnings.push('NODE_ENV o\'rnatilmagan — development deb qabul qilinadi');
+  }
+
+  warnings.forEach(w => logger.warn(w));
+  errors.forEach(e => logger.error(e));
+
+  // Kritik xatolar bo'lsa serverni to'xtatish
+  if (errors.length > 0) {
+    logger.error('Kritik konfiguratsiya xatolari. Server to\'xtatildi.');
+    process.exit(1);
+  }
+}
+
 app.listen(PORT, () => {
-  console.log(`\n⬡  TenderMind Server — http://localhost:${PORT}`);
-  console.log(`   AI: ${process.env.ANTHROPIC_API_KEY ? '✅ Sozlangan' : '❌ .env ga API key kiriting'}`);
-  console.log(`   Mode: ${process.env.NODE_ENV || 'development'}\n`);
+  validateStartupConfig();
+  logger.info(`TenderMind Server — http://localhost:${PORT}`);
+  logger.info(`AI: ${isGeminiConfigured() ? '✅ Gemini ulandi' : '❌ .env ga GEMINI_API_KEY kiriting'}`);
+  logger.info(`Mode: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Tenderlar: ${TENDERS_DB.length} ta ma'lumot bazada`);
+});
+
+// Graceful shutdown — SIGTERM va SIGINT signallarini ushlash
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM signal — server yopilmoqda...');
+  process.exit(0);
+});
+process.on('SIGINT', () => {
+  logger.info('SIGINT signal — server yopilmoqda...');
+  process.exit(0);
 });

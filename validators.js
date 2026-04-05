@@ -15,23 +15,37 @@ const validators = {
   // Password (min 6 chars, no spaces)
   password: (val) => val && val.length >= 6 && !/\s/.test(val),
   
-  // Company name (2-100 chars, no special chars except -, /, .)
-  company: (val) => /^[a-zA-Z0-9\u0400-\u04FF\s\-\/.]{2,100}$/.test(val),
+  // Company name (2-100 chars; O'zbek/apostrof va oddiy belgilar)
+  company: (val) => /^[a-zA-Z0-9\u0400-\u04FF\s\-\/.'ʼʻ`]{2,100}$/.test(val),
   
-  // Person name (2-50 chars)
-  name: (val) => /^[a-zA-Z0-9\u0400-\u04FF\s]{2,50}$/.test(val),
+  // Person name (2-50 chars; O'zbekiston, O‘zbekiston va h.k.)
+  name: (val) => /^[a-zA-Z0-9\u0400-\u04FF\s\-.'ʼʻ`]{2,50}$/.test(val),
   
   // INN (12 digits for Uzbekistan)
   inn: (val) => /^\d{12}$/.test(val),
   
-  // Price (positive number)
-  price: (val) => /^\d+$/.test(val) && parseInt(val) > 0,
+  // Narx validatsiyasi (max 100 trillion so'm) — QO'SHIMCHA #10
+  price: (val) => {
+    const n = Number(val);
+    return !isNaN(n) && n > 0 && n <= 100_000_000_000_000;
+  },
   
   // URL slug
   slug: (val) => /^[a-z0-9\-]{3,50}$/.test(val),
   
   // Text (1-5000 chars, no HTML)
   text: (val) => typeof val === 'string' && val.length >= 1 && val.length <= 5000 && !/<[^>]*>/g.test(val),
+
+  // QO'SHIMCHA #10: Kuchli parol tekshiruvi (kamida 8 belgi, raqam yoki maxsus belgi bilan)
+  strongPassword: (val) => {
+    if (!val || val.length < 8) return false;
+    if (/\s/.test(val)) return false;
+    // Kamida bitta raqam yoki maxsus belgi
+    return /[0-9!@#$%^&*]/.test(val);
+  },
+
+  // QO'SHIMCHA #10: Tender ID formati tekshiruvi
+  tenderId: (val) => /^[a-z0-9\-]{2,20}$/.test(val),
 };
 
 // ── Sanitizers ─────────────────────────────────────────────────────
@@ -96,16 +110,15 @@ function validate(data, rules) {
 
 // ── Sanitize Data ────────────────────────────────────────────────────
 function sanitize(data, schema) {
-  const sanitized = {};
-  
+  const src = data && typeof data === 'object' ? data : {};
+  const sanitized = { ...src };
+
   for (const [field, sanitizer] of Object.entries(schema)) {
-    if (data.hasOwnProperty(field) && sanitizers[sanitizer]) {
-      sanitized[field] = sanitizers[sanitizer](data[field]);
-    } else {
-      sanitized[field] = data[field];
+    if (Object.prototype.hasOwnProperty.call(src, field) && sanitizers[sanitizer]) {
+      sanitized[field] = sanitizers[sanitizer](src[field]);
     }
   }
-  
+
   return sanitized;
 }
 
@@ -127,6 +140,17 @@ function sanitizeBody(schema) {
   };
 }
 
+// ── Uzbekistan phone: +998 + 9–12 raqam ───────────────────────────────
+function normalizeUzbekPhone(input) {
+  if (input == null || typeof input !== 'string') return '';
+  const compact = input.replace(/\s/g, '');
+  if (/^\+998\d{9,12}$/.test(compact)) return compact;
+  const digits = input.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('998')) return `+${digits}`;
+  if (digits.length === 9 && digits.startsWith('9')) return `+998${digits}`;
+  return compact.trim();
+}
+
 // ── Export ───────────────────────────────────────────────────────────
 module.exports = {
   validate,
@@ -135,4 +159,5 @@ module.exports = {
   sanitizers,
   validateBody,
   sanitizeBody,
+  normalizeUzbekPhone,
 };

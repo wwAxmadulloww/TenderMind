@@ -1,0 +1,26 @@
+# QO'SHIMCHA #1: .gitignore — maxfiy va keraksiz fayllarni git dan yashirish
+
+# Muhit o'zgaruvchilari — HECH QACHON git ga yuklanmasin
+.env
+
+# Ma'lumotlar bazasi — maxfiy foydalanuvchi ma'lumotlari
+db.json
+
+# Node modules — git ga shart emas, npm install orqali tiklanadi
+node_modules/
+
+# Vaqtinchalik yozish fayllari (writeDBSafe tmp fayllar)
+*.tmp
+*.corrupt.*
+
+# macOS tizim fayllari
+.DS_Store
+Thumbs.db
+
+# Log fayllari
+*.log
+logs/
+
+# Build fayllari (agar kerak bo'lsa)
+dist/
+build/

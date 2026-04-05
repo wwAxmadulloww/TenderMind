@@ -5,7 +5,7 @@
 
 'use strict';
 
-const API = ''; // same-origin (server.js serves static files)
+const API = 'http://localhost:4010'; // Gemini AI server (port 4010)
 
 // ── State ──────────────────────────────────────────────────────────
 const state = {
@@ -29,7 +29,35 @@ document.addEventListener('DOMContentLoaded', () => {
   animateCounters();
   fetchTenders();
   renderSavedTab();
+  initAIChatInput();
 });
+
+function initAIChatInput() {
+  const ta = document.getElementById('ai-chat-input');
+  if (!ta) return;
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendAIChat(e);
+    }
+  });
+}
+
+function escapeChatHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatChatMarkdown(text) {
+  let s = escapeChatHtml(text);
+  s = s.replace(/^###\s+(.+)$/gm, '<strong class="chat-md-h">$1</strong>');
+  s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  s = s.replace(/^-\s+(.+)$/gm, '• $1');
+  s = s.replace(/\n/g, '<br>');
+  return s;
+}
 
 // ── PAGE NAVIGATION ──────────────────────────────────────────────
 function showPage(id) {
@@ -149,7 +177,11 @@ async function doLogin(e) {
       body: JSON.stringify({ phone, password })
     });
     const data = await r.json();
-    if (!r.ok) { showToast(data.error || 'Xatolik', 'error'); return; }
+    if (!r.ok) {
+      const msg = data.errors ? Object.values(data.errors).join(' ') : (data.error || 'Xatolik');
+      showToast(msg, 'error');
+      return;
+    }
     state.token = data.token; state.user = data.user;
     localStorage.setItem('tm_token', data.token);
     localStorage.setItem('tm_user', JSON.stringify(data.user));
@@ -174,7 +206,11 @@ async function doRegister(e) {
       body: JSON.stringify({ name, phone, company, password })
     });
     const data = await r.json();
-    if (!r.ok) { showToast(data.error || 'Xatolik', 'error'); return; }
+    if (!r.ok) {
+      const msg = data.errors ? Object.values(data.errors).join(' ') : (data.error || 'Xatolik');
+      showToast(msg, 'error');
+      return;
+    }
     state.token = data.token; state.user = data.user;
     localStorage.setItem('tm_token', data.token);
     localStorage.setItem('tm_user', JSON.stringify(data.user));
@@ -329,9 +365,9 @@ function filterTenders() {
   fetchTenders(1);
 }
 
-function sortTenders(by) {
+function sortTenders(by, el) {
   document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  if (el && el.classList) el.classList.add('active');
   state.filters.sort = by;
   fetchTenders(1);
 }
@@ -744,7 +780,7 @@ async function renderWonTab() {
   }
 }
 
-// ── CABINET TAB ───────────────────────────────────────────────────
+// Kabinet tabini render qilish — profil ma'lumotlarini ko'rsatish
 function renderCabinet() {
   if (!state.user) return;
   document.getElementById('cab-profile-info').innerHTML = `
@@ -754,6 +790,75 @@ function renderCabinet() {
   `;
   document.getElementById('stat-saved').textContent = state.savedIds.size;
   document.getElementById('stat-won').textContent = state.wonIds.size;
+
+  // QO'SHIMCHA #7: Profil formasi maydonlarini joriy ma'lumotlar bilan to'ldirish
+  const nameField = document.getElementById('update-name');
+  const companyField = document.getElementById('update-company');
+  if (nameField && state.user.name) nameField.value = state.user.name;
+  if (companyField && state.user.company) companyField.value = state.user.company;
+}
+
+// QO'SHIMCHA #7: Profil yangilash funksiyasi
+async function updateProfile(e) {
+  e.preventDefault();
+  // Maydon qiymatlarini olish
+  const name = document.getElementById('update-name')?.value.trim();
+  const company = document.getElementById('update-company')?.value.trim();
+  const btn = document.getElementById('update-profile-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saqlanmoqda...'; }
+
+  try {
+    // Server ga yangilangan ma'lumotlarni yuborish
+    const r = await fetch(`${API}/api/auth/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` },
+      body: JSON.stringify({ name, company })
+    });
+    const data = await r.json();
+    if (!r.ok) { showToast(data.error || 'Xatolik', 'error'); return; }
+
+    // State va localStorage ni yangilash
+    state.user = { ...state.user, ...data.user };
+    localStorage.setItem('tm_user', JSON.stringify(state.user));
+    updateAuthUI();
+    renderCabinet();
+    showToast('Profil yangilandi!', 'success');
+  } catch { showToast('Serverga ulanib bo\'lmadi', 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Saqlash'; } }
+}
+
+// QO'SHIMCHA #7: Parolni o'zgartirish funksiyasi
+async function changePassword(e) {
+  e.preventDefault();
+  // Forma maydonlarini olish
+  const currentPassword = document.getElementById('current-password')?.value;
+  const newPassword = document.getElementById('new-password')?.value;
+  const confirmPassword = document.getElementById('confirm-password')?.value;
+  const btn = document.getElementById('change-pwd-btn');
+
+  // Parollar mosligini tekshirish
+  if (newPassword !== confirmPassword) {
+    showToast('Yangi parollar mos kelmaydi', 'error'); return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'O\'zgartirilmoqda...'; }
+
+  try {
+    // Server ga parol o'zgartirish so'rovini yuborish
+    const r = await fetch(`${API}/api/auth/change-password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` },
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    const data = await r.json();
+    if (!r.ok) { showToast(data.error || 'Xatolik', 'error'); return; }
+
+    // Muvaffaqiyatli o'zgartirilganda formani tozalash
+    showToast('Parol o\'zgartirildi!', 'success');
+    document.getElementById('current-password').value = '';
+    document.getElementById('new-password').value = '';
+    document.getElementById('confirm-password').value = '';
+  } catch { showToast('Serverga ulanib bo\'lmadi', 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'O\'zgartirish'; } }
 }
 
 // ══════════════════════════════════════════════
@@ -1163,10 +1268,10 @@ function showGenerated(show) {
   }
 }
 
-function switchDocTab(name) {
+function switchDocTab(name, btn) {
   document.querySelectorAll('.doc-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.doc-output').forEach(d => d.classList.add('hidden'));
-  event.target.classList.add('active');
+  if (btn && btn.classList) btn.classList.add('active');
   document.getElementById(`doc-output-${name}`)?.classList.remove('hidden');
 }
 
@@ -1199,62 +1304,59 @@ function restartDoc() {
   document.getElementById('doc-form').reset();
 }
 
-// ── EXPORT DOCS ───────────────────────────────────────────────────
+// ── EXPORT DOCS (7 ta hujjat — server orqali Word/PDF) ─────────────
+function collectAllGeneratedDocs() {
+  const keys = ['ariza', 'kafolat', 'kompaniya', 'texnik', 'narx', 'moliya', 'vakolat'];
+  const docs = {};
+  for (const k of keys) {
+    const el = document.getElementById(`doc-output-${k}`);
+    const t = (el?.textContent || '').trim();
+    if (t) docs[k] = el.textContent;
+  }
+  return Object.keys(docs).length ? docs : null;
+}
+
 async function exportDoc(type) {
-  const activeTab = document.querySelector('.doc-tab.active');
-  const typeId = activeTab ? activeTab.getAttribute('onclick').match(/'([^']+)'/)[1] : 'technical';
-  const outEl = document.getElementById(`doc-output-${typeId}`);
-  if (!outEl || !outEl.textContent) {
+  const docs = collectAllGeneratedDocs();
+  if (!docs) {
     showToast('Oldin hujjat generatsiya qiling!', 'warning');
     return;
   }
-  
-  const titleMap = { technical: "Texnik Taklif", financial: "Moliyaviy Taklif", profile: "Kompaniya Profili" };
-  const filename = `${titleMap[typeId] || 'Hujjat'}_${document.getElementById('company-name').value || 'Mijoz'}`;
-  
-  showToast(`Hujjat (${type.toUpperCase()}) tayyorlanmoqda...`, 'info');
 
-  if (type === 'pdf') {
-    // Beautiful Frontend PDF Generation
-    const opt = {
-      margin: 10,
-      filename: `${filename}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    try {
-      await html2pdf().set(opt).from(outEl).save();
-      showToast('PDF muvaffaqiyatli saqlandi', 'success');
-    } catch (err) {
-      console.error(err);
-      showToast('PDF saqlashda xatolik', 'error');
+  const company = (document.getElementById('company-name')?.value || 'Mijoz').trim().replace(/\s+/g, '_');
+  const tender = (document.getElementById('tender-name')?.value || 'Tender').trim().replace(/\s+/g, '_');
+  const baseTitle = `TenderMind_${company}_${tender}`.slice(0, 120);
+
+  if (type !== 'word' && type !== 'pdf') {
+    showToast('Notanish eksport turi', 'error');
+    return;
+  }
+
+  showToast(`7 ta hujjat (${type.toUpperCase()}) tayyorlanmoqda...`, 'info');
+
+  try {
+    const r = await fetch(`${API}/api/export/${type}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: baseTitle, docs })
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.error || 'Export error');
     }
-  } else {
-    // Backend Word export
-    try {
-      const r = await fetch(`/api/export/${type}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: filename, content: outEl.textContent })
-      });
-      if (!r.ok) throw new Error('Export error');
-      
-      const blob = await r.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${filename}.docx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      showToast(`Hujjat (WORD) saqlandi`, 'success');
-    } catch (err) {
-      console.error(err);
-      showToast('Word eksport qilishda xatolik yuz berdi', 'error');
-    }
+    const blob = await r.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${baseTitle}.${type === 'word' ? 'docx' : 'pdf'}`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    a.remove();
+    showToast(type === 'word' ? 'Word (7 hujjat) yuklab olindi' : 'PDF (7 hujjat) yuklab olindi', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Eksportda xatolik yuz berdi', 'error');
   }
 }
 
@@ -1465,8 +1567,8 @@ function clearChatHistory() {
     <div class="ai-msg ai-msg-bot">
       <div class="ai-msg-avatar">🤖</div>
       <div class="ai-msg-bubble">
-        <b>Suhbat tozalandi! 🔄</b><br><br>
-        Yangi savol bering yoki tenderlar sahifasidan tender tanlang.
+        <b>Yangi suhbat 🔄</b><br><br>
+        Tenderlar, hujjatlar yoki <i>«tushunmayman, tushuntir»</i> — har qanday savolni yozing. Tender tanlasangiz, shu bo'yicha chuqurroq javob beraman.
       </div>
     </div>`;
   }
@@ -1537,7 +1639,7 @@ async function sendAIChat(e) {
       body: JSON.stringify({
         message,
         tenderContext: chatState.tenderContext,
-        history: chatState.history.slice(-10)
+        history: chatState.history.slice(0, -1).slice(-24)
       })
     });
     const data = await r.json();
@@ -1562,11 +1664,9 @@ function appendChatMessage(role, text, aiGenerated = false) {
   const div = document.createElement('div');
   div.className = `ai-msg ai-msg-${role === 'user' ? 'user' : 'bot'}`;
 
-  // Format markdown-like text
-  let formatted = text
-    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-    .replace(/\n/g, '<br>')
-    .replace(/• /g, '&bull; ');
+  const formatted = role === 'user'
+    ? escapeChatHtml(text).replace(/\n/g, '<br>')
+    : formatChatMarkdown(text);
 
   if (role === 'user') {
     div.innerHTML = `<div class="ai-msg-bubble user-bubble">${formatted}</div>`;
@@ -1575,7 +1675,7 @@ function appendChatMessage(role, text, aiGenerated = false) {
       <div class="ai-msg-avatar">🤖</div>
       <div class="ai-msg-bubble">
         ${formatted}
-        ${aiGenerated !== false ? '<div class="ai-badge">✨ AI Generated</div>' : '<div class="ai-badge demo">📊 Smart Template</div>'}
+        ${aiGenerated !== false ? '<div class="ai-badge">✨ Claude AI</div>' : '<div class="ai-badge demo">📴 API yo‘q — qisqa javob</div>'}
       </div>`;
   }
 
