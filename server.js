@@ -19,6 +19,7 @@ const fs        = require('fs');
 const docx      = require('docx');
 const PDFDocument = require('pdfkit');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai').default || require('openai');
 const logger    = require('./logger');
 const { validateBody, sanitizeBody, normalizeUzbekPhone } = require('./validators');
 const { connectDB, User, mongoose } = require('./db');
@@ -41,53 +42,100 @@ if (!JWT_SECRET) {
   logger.warn('JWT_SECRET o\'rnatilmagan — faqat development uchun standart parol ishlatilmoqda');
 }
 
-// ── Google Gemini Client ──────────────────────────────────────────────
-// API kalit — har so'rovda .env fayldan yangi o'qiladi (eski jarayon ham ishlaydi)
-const GEMINI_API_KEY_FALLBACK = 'AIzaSyB6msmY1FyyfClVuKf1VmXQQiTKPUkoqkc';
+// ── AI Client (OpenAI primary, Gemini fallback) ───────────────────────────
+const GEMINI_API_KEY_FALLBACK = '';
 
-/** .env fayldan runtime da API keyni o'qish */
+/** OpenAI API keyni olish */
+function getOpenAIApiKey() {
+  const fromEnv = (process.env.OPENAI_API_KEY || '').trim();
+  if (fromEnv.length >= 20) return fromEnv;
+  // .env fayldan o'qish
+  try {
+    const envFile = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+    const match = envFile.match(/^OPENAI_API_KEY\s*=\s*(.+)$/m);
+    if (match && match[1].trim().length >= 20) return match[1].trim();
+  } catch { /* ignore */ }
+  return '';
+}
+
+/** Gemini API keyni olish (fallback) */
 function getGeminiApiKey() {
-  // 1. Environment variable (yangi jarayon)
   const fromEnv = (process.env.GEMINI_API_KEY || '').trim();
   if (fromEnv.length >= 20) return fromEnv;
-  // 2. .env faylni runtime da o'qish (eski jarayon uchun)
   try {
     const envFile = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
     const match = envFile.match(/^GEMINI_API_KEY\s*=\s*(.+)$/m);
     if (match && match[1].trim().length >= 20) return match[1].trim();
   } catch { /* ignore */ }
-  // 3. Hardcoded fallback
   return GEMINI_API_KEY_FALLBACK;
 }
 
-function getGeminiClient() {
-  return new GoogleGenerativeAI(getGeminiApiKey());
-}
-
-/** Haqiqiy Gemini kalit bor-yo'qligi tekshiruvi */
+/** AI sozlanganmi tekshirish */
 function isGeminiConfigured() {
-  return getGeminiApiKey().length >= 20;
+  return getOpenAIApiKey().length >= 20 || getGeminiApiKey().length >= 20;
 }
 
-/** Gemini orqali bir martalik matn generatsiya */
-async function geminiGenerate(prompt, systemInstruction, modelName) {
-  const genAI = getGeminiClient();
+/** OpenAI orqali matn generatsiya */
+async function openAIGenerate(prompt, systemInstruction) {
+  const apiKey = getOpenAIApiKey();
+  if (!apiKey) throw new Error('OPENAI_API_KEY topilmadi');
+  const client = new OpenAI({ apiKey });
+  const messages = [];
+  if (systemInstruction) messages.push({ role: 'system', content: systemInstruction });
+  messages.push({ role: 'user', content: prompt });
+  const response = await client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages,
+    max_tokens: 16000,
+    temperature: 0.7,
+  });
+  return response.choices[0].message.content;
+}
+
+/** Gemini orqali matn generatsiya (fallback) */
+async function geminiGenerateFallback(prompt, systemInstruction) {
+  const genAI = new GoogleGenerativeAI(getGeminiApiKey());
   const model = genAI.getGenerativeModel({
-    model: modelName || 'gemini-1.5-flash',
+    model: 'gemini-1.5-flash',
     ...(systemInstruction ? { systemInstruction } : {}),
   });
   const result = await model.generateContent(prompt);
   return result.response.text();
 }
 
-/** Gemini chat sessiyasi orqali ko'p turn suhbat */
+/** Asosiy AI matn generatsiya funksiyasi — OpenAI primary, Gemini fallback */
+async function geminiGenerate(prompt, systemInstruction, _modelName) {
+  if (getOpenAIApiKey().length >= 20) {
+    return openAIGenerate(prompt, systemInstruction);
+  }
+  return geminiGenerateFallback(prompt, systemInstruction);
+}
+
+/** AI chat sessiyasi */
 async function geminiChat(systemInstruction, history, userMessage) {
-  const genAI = getGeminiClient();
+  const apiKey = getOpenAIApiKey();
+  if (apiKey.length >= 20) {
+    const client = new OpenAI({ apiKey });
+    const messages = [];
+    if (systemInstruction) messages.push({ role: 'system', content: systemInstruction });
+    for (const h of (history || [])) {
+      messages.push({ role: h.role === 'model' ? 'assistant' : 'user', content: h.parts[0].text });
+    }
+    messages.push({ role: 'user', content: userMessage });
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages,
+      max_tokens: 4000,
+      temperature: 0.8,
+    });
+    return response.choices[0].message.content;
+  }
+  // Gemini fallback
+  const genAI = new GoogleGenerativeAI(getGeminiApiKey());
   const model = genAI.getGenerativeModel({
     model: 'gemini-1.5-flash',
     ...(systemInstruction ? { systemInstruction } : {}),
   });
-  // history: [{role:'user'|'model', parts:[{text:'...'}]}]
   const chat = model.startChat({ history: history || [] });
   const result = await chat.sendMessage(userMessage);
   return result.response.text();

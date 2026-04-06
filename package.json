@@ -20,6 +20,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^7.1.1",
     "mongoose": "^9.4.1",
+    "openai": "^4.104.0",
     "pdfkit": "^0.18.0",
     "uuid": "^9.0.1"
   }
