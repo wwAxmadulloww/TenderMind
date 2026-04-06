@@ -842,8 +842,10 @@ app.post('/api/auth/register',
     res.status(201).json({ success: true, token, user: { id: user.id, name: user.name, phone: user.phone, company: user.company } });
   } catch (err) {
     logger.error('Register error', err);
-    if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({ error: 'Bazaga ulanish yo\'q. Bir oz kutib qaytadan urinib ko\'ring.' });
+    const isDBError = err.name === 'MongoNetworkError' || err.name === 'MongooseServerSelectionError' || 
+                      (err.message && (err.message.includes('ECONNREFUSED') || err.message.includes('topology')));
+    if (isDBError) {
+      return res.status(503).json({ error: 'Server yuklanmoqda. 10-20 soniyadan keyin qaytadan urinib ko\'ring.' });
     }
     res.status(500).json({ error: 'Ro\'yxatdan o\'tishda xatolik yuz berdi' });
   }
@@ -856,10 +858,6 @@ app.post('/api/auth/login',
   try {
     const { phone, password } = req.body;
 
-    if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({ error: 'Bazaga ulanish yo\'q. Bir oz kutib qaytadan urinib ko\'ring.' });
-    }
-
     const user = await User.findOne({ phone });
     if (!user) return res.status(401).json({ error: 'Telefon yoki parol noto\'g\'ri' });
 
@@ -870,8 +868,10 @@ app.post('/api/auth/login',
     res.json({ success: true, token, user: { id: user.id, name: user.name, phone: user.phone, company: user.company } });
   } catch (err) {
     logger.error('Login error', err);
-    if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({ error: 'Bazaga ulanish yo\'q. Bir oz kutib qaytadan urinib ko\'ring.' });
+    const isDBError = err.name === 'MongoNetworkError' || err.name === 'MongooseServerSelectionError' || 
+                      (err.message && (err.message.includes('ECONNREFUSED') || err.message.includes('topology')));
+    if (isDBError) {
+      return res.status(503).json({ error: 'Server yuklanmoqda. 10-20 soniyadan keyin qaytadan urinib ko\'ring.' });
     }
     res.status(500).json({ error: 'Kirishda xatolik yuz berdi' });
   }
