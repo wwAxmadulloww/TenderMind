@@ -73,7 +73,7 @@ function isGeminiConfigured() {
 async function geminiGenerate(prompt, systemInstruction, modelName) {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: modelName || 'gemini-2.5-flash',
+    model: modelName || 'gemini-1.5-flash',
     ...(systemInstruction ? { systemInstruction } : {}),
   });
   const result = await model.generateContent(prompt);
@@ -84,7 +84,7 @@ async function geminiGenerate(prompt, systemInstruction, modelName) {
 async function geminiChat(systemInstruction, history, userMessage) {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-1.5-flash',
     ...(systemInstruction ? { systemInstruction } : {}),
   });
   // history: [{role:'user'|'model', parts:[{text:'...'}]}]
@@ -566,7 +566,7 @@ JSON formatda qaytar (faqat JSON, boshqa hech narsa yo'q):
 }`;
 
   try {
-    const rawText = await geminiGenerate(userPrompt, systemPrompt, 'gemini-2.5-flash');
+    const rawText = await geminiGenerate(userPrompt, systemPrompt, 'gemini-1.5-flash');
     let parsed;
     try {
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -581,6 +581,9 @@ JSON formatda qaytar (faqat JSON, boshqa hech narsa yo'q):
     logger.error('AI API error', err);
     if (err.status === 401 || (err.message && err.message.includes('API_KEY'))) {
       return res.status(401).json({ error: 'Gemini API kalit yaroqsiz. .env faylini tekshiring.' });
+    }
+    if (err.message && err.message.includes('404')) {
+      return res.status(503).json({ error: 'AI modeli topilmadi. Administrator bilan bog\'laning.' });
     }
     res.status(500).json({ error: 'AI xizmatida xatolik. Qaytadan urinib ko\'ring.' });
   }
@@ -640,7 +643,7 @@ JSON formatda qaytаr:
 }`;
 
   try {
-    const rawText = await geminiGenerate(prompt, null, 'gemini-2.5-flash');
+    const rawText = await geminiGenerate(prompt, null, 'gemini-1.5-flash');
     let parsed;
     try {
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -744,7 +747,7 @@ Ushbu formatda javob ber JSON (faqat JSON, boshqa hech narsa yo'q):
   "timeToBid": "Hujjatlar tayyorlash uchun taxminiy vaqt kun hisobida"
 }`;
 
-    const responseText = await geminiGenerate(comparePrompt, null, 'gemini-2.5-flash');
+    const responseText = await geminiGenerate(comparePrompt, null, 'gemini-1.5-flash');
 
     let comparison;
     try {
@@ -819,39 +822,59 @@ app.post('/api/auth/register',
   normalizeAuthPhone,
   validateBody(registerRules),
   async (req, res) => {
-  const { name, phone, password, company } = req.body;
+  try {
+    const { name, phone, password, company } = req.body;
 
-  const existingUser = await User.findOne({ phone });
-  if (existingUser) {
-    return res.status(409).json({ error: 'Bu telefon raqam allaqachon ro\'yxatdan o\'tgan' });
+    const existingUser = await User.findOne({ phone });
+    if (existingUser) {
+      return res.status(409).json({ error: 'Bu telefon raqam allaqachon ro\'yxatdan o\'tgan' });
+    }
+
+    const hashedPwd = await bcrypt.hash(password, 10);
+    const user = await User.create({ 
+      name, 
+      phone, 
+      company: company || '', 
+      passwordHash: hashedPwd 
+    });
+
+    const token = jwt.sign({ id: user.id, name: user.name, phone: user.phone }, JWT_SECRET, { expiresIn: '30d' });
+    res.status(201).json({ success: true, token, user: { id: user.id, name: user.name, phone: user.phone, company: user.company } });
+  } catch (err) {
+    logger.error('Register error', err);
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: 'Bazaga ulanish yo\'q. Bir oz kutib qaytadan urinib ko\'ring.' });
+    }
+    res.status(500).json({ error: 'Ro\'yxatdan o\'tishda xatolik yuz berdi' });
   }
-
-  const hashedPwd = await bcrypt.hash(password, 10);
-  const user = await User.create({ 
-    name, 
-    phone, 
-    company: company || '', 
-    passwordHash: hashedPwd 
-  });
-
-  const token = jwt.sign({ id: user.id, name: user.name, phone: user.phone }, JWT_SECRET, { expiresIn: '30d' });
-  res.status(201).json({ success: true, token, user: { id: user.id, name: user.name, phone: user.phone, company: user.company } });
 });
 
 app.post('/api/auth/login',
   normalizeAuthPhone,
   validateBody(loginRules),
   async (req, res) => {
-  const { phone, password } = req.body;
+  try {
+    const { phone, password } = req.body;
 
-  const user = await User.findOne({ phone });
-  if (!user) return res.status(401).json({ error: 'Telefon yoki parol noto\'g\'ri' });
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: 'Bazaga ulanish yo\'q. Bir oz kutib qaytadan urinib ko\'ring.' });
+    }
 
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(401).json({ error: 'Telefon yoki parol noto\'g\'ri' });
+    const user = await User.findOne({ phone });
+    if (!user) return res.status(401).json({ error: 'Telefon yoki parol noto\'g\'ri' });
 
-  const token = jwt.sign({ id: user.id, name: user.name, phone: user.phone }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ success: true, token, user: { id: user.id, name: user.name, phone: user.phone, company: user.company } });
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) return res.status(401).json({ error: 'Telefon yoki parol noto\'g\'ri' });
+
+    const token = jwt.sign({ id: user.id, name: user.name, phone: user.phone }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ success: true, token, user: { id: user.id, name: user.name, phone: user.phone, company: user.company } });
+  } catch (err) {
+    logger.error('Login error', err);
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: 'Bazaga ulanish yo\'q. Bir oz kutib qaytadan urinib ko\'ring.' });
+    }
+    res.status(500).json({ error: 'Kirishda xatolik yuz berdi' });
+  }
 });
 
 app.get('/api/auth/me', authMiddleware, async (req, res) => {

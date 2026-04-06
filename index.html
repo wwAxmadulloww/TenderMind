@@ -719,11 +719,13 @@
 <!-- TOAST CONTAINER -->
 <div id="toast-container"></div>
 
+<script src="i18n.js"></script>
 <script src="app.js"></script>
 <script>
-  // Initialize i18n
+  // Initialize i18n after all scripts loaded
   document.addEventListener('DOMContentLoaded', () => {
-    if(typeof setLang === 'function') setLang(currentLang);
+    const savedLang = localStorage.getItem('tm_lang') || 'uz';
+    if(typeof setLang === 'function') setLang(savedLang);
   });
 </script>
 </body>

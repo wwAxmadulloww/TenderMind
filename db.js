@@ -40,11 +40,16 @@ const connectDB = async () => {
   try {
     await mongoose.connect(MONGODB_URI, {
       maxPoolSize: 10,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
     });
-    console.log('MongoDB ga muvaffaqiyatli ulandi');
+    console.log('✅ MongoDB ga muvaffaqiyatli ulandi');
   } catch (error) {
-    console.error('MongoDB ga ulanishda xato:', error.message);
-    // Don't kill process just let it retry manually or fail gracefully
+    console.error('❌ MongoDB ga ulanishda xato:', error.message);
+    // Render cold start uchun 5 sekunddan keyin qayta urinish
+    console.log('⏳ 5 sekunddan keyin qayta uriniladi...');
+    setTimeout(connectDB, 5000);
   }
 };
 

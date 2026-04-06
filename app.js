@@ -175,10 +175,14 @@ async function doLogin(e) {
   const btn = document.getElementById('login-btn');
   btn.disabled = true; btn.textContent = 'Kirmoqda...';
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     const r = await fetch(`${API}/api/auth/login`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ phone, password })
+      body: JSON.stringify({ phone, password }),
+      signal: controller.signal
     });
+    clearTimeout(timeout);
     const data = await r.json();
     if (!r.ok) {
       const msg = data.errors ? Object.values(data.errors).join(' ') : (data.error || 'Xatolik');
@@ -191,7 +195,13 @@ async function doLogin(e) {
     hideModal('auth-modal');
     updateAuthUI(); fetchSavedIds(); fetchWonIds();
     showToast(`Xush kelibsiz, ${data.user.name}! 👋`, 'success');
-  } catch { showToast('Serverga ulanib bo\'lmadi', 'error'); }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      showToast('Server javob bermadi (15s). Render serveri yuklanmoqda bo\'lishi mumkin, qaytadan urinib ko\'ring.', 'error');
+    } else {
+      showToast('Tarmoq xatosi. Internet aloqangizni tekshiring.', 'error');
+    }
+  }
   finally { btn.disabled = false; btn.textContent = 'Kirish'; }
 }
 
@@ -204,10 +214,14 @@ async function doRegister(e) {
   const btn = document.getElementById('register-btn');
   btn.disabled = true; btn.textContent = "Ro'yxatdan o'tmoqda...";
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     const r = await fetch(`${API}/api/auth/register`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ name, phone, company, password })
+      body: JSON.stringify({ name, phone, company, password }),
+      signal: controller.signal
     });
+    clearTimeout(timeout);
     const data = await r.json();
     if (!r.ok) {
       const msg = data.errors ? Object.values(data.errors).join(' ') : (data.error || 'Xatolik');
@@ -220,7 +234,13 @@ async function doRegister(e) {
     hideModal('auth-modal');
     updateAuthUI();
     showToast('Muvaffaqiyatli ro\'yxatdan o\'tildi! 🎉', 'success');
-  } catch { showToast('Serverga ulanib bo\'lmadi', 'error'); }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      showToast('Server javob bermadi (15s). Render serveri yuklanmoqda bo\'lishi mumkin, qaytadan urinib ko\'ring.', 'error');
+    } else {
+      showToast('Tarmoq xatosi. Internet aloqangizni tekshiring.', 'error');
+    }
+  }
   finally { btn.disabled = false; btn.textContent = "Ro'yxatdan o'tish"; }
 }
 
