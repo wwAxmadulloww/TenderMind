@@ -36,8 +36,8 @@
   <nav class="navbar" id="navbar">
     <div class="nav-container">
       <a href="#" class="nav-logo" onclick="showPage('landing-page')">
-        <span class="logo-icon">⬡</span>
-        <span class="logo-text">TenderMind</span>
+        <img src="logo.png" alt="TenderMind" class="nav-logo-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <span class="nav-logo-fallback" style="display:none;align-items:center;gap:8px"><span class="logo-icon">⬡</span><span class="logo-text">TenderMind</span></span>
       </a>
       <div class="nav-links">
         <a href="#features" class="nav-link" data-i18n="navFeatures">Imkoniyatlar</a>
@@ -260,7 +260,8 @@
       <button class="back-btn" onclick="showPage('landing-page')">← Orqaga</button>
       <div class="app-logo">
         <span class="logo-icon">⬡</span>
-        <span class="logo-text">TenderMind</span>
+        <img src="logo.png" alt="TenderMind" style="height:36px;object-fit:contain" onerror="this.style.display='none'">
+        <span class="logo-text" style="display:none">TenderMind</span>
         <span class="app-label">v2.1</span>
       </div>
       <div class="app-nav-right">
@@ -321,12 +322,45 @@
               </select>
             </div>
             <div class="filter-group">
+              <label class="filter-label" for="filter-hudud">Hudud</label>
+              <select class="filter-select" id="filter-hudud" onchange="filterTenders()">
+                <option value="all">Barchasi</option>
+                <option value="toshkent">Toshkent</option>
+                <option value="samarqand">Samarqand</option>
+                <option value="namangan">Namangan</option>
+                <option value="andijon">Andijon</option>
+                <option value="fargona">Farg'ona</option>
+                <option value="buxoro">Buxoro</option>
+                <option value="qashqadaryo">Qashqadaryo</option>
+                <option value="xorazm">Xorazm</option>
+                <option value="surxondaryo">Surxondaryo</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label class="filter-label" for="filter-status">Holat</label>
+              <select class="filter-select" id="filter-status" onchange="filterTenders()">
+                <option value="all">Barchasi</option>
+                <option value="active">Aktiv</option>
+                <option value="urgent">Shoshilinch</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label class="filter-label" for="filter-sort">Saralash</label>
+              <select class="filter-select" id="filter-sort" onchange="sortTenders(this.value, this)">
+                <option value="probability">G'alaba ehtimoli</option>
+                <option value="budget">Byudjet (katta)</option>
+                <option value="date">Muddati (yaqin)</option>
+                <option value="newest">Yangi qo'shilgan</option>
+              </select>
+            </div>
+            <div class="filter-group">
               <label class="filter-label" for="filter-search" data-i18n="filterSearch">Qidirish</label>
               <input type="text" id="filter-search" class="filter-input" data-i18n-placeholder="filterSearch" placeholder="Qidirish" oninput="filterTenders()" />
             </div>
             <button class="btn-search" onclick="filterTenders()" data-i18n="btnSearch">Qidirish</button>
             <button class="btn-ai-recommend" onclick="showModal('ai-recommend-modal')" title="AI Tender Tavsiyasi">🤖 AI Tavsiya</button>
           </div>
+
 
           <div class="results-header">
             <span class="results-count" id="results-count">...</span>

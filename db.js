@@ -9,11 +9,12 @@ const UserSchema = new mongoose.Schema({
   id: {
     type: String,
     default: uuidv4,
-    unique: true
+    unique: true,
+    index: true
   },
   name: { type: String, required: true },
-  phone: { type: String, required: true }, // Not forced unique for legacy compatibility (just unique search space)
-  company: { type: String, required: true },
+  phone: { type: String, required: true, unique: true, index: true },
+  company: { type: String, required: false, default: '' },
   passwordHash: { type: String, required: true },
   role: { type: String, default: 'user' },
   savedTenders: {

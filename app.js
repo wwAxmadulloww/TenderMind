@@ -7,7 +7,7 @@
 
 // Frontend endi host etilgan domenga avtomatik moslashadi (Render yoki Localhost)
 const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-  ? 'http://localhost:4020' 
+  ? 'http://localhost:3001' 
   : '';
 
 // ── State ──────────────────────────────────────────────────────────
@@ -342,9 +342,12 @@ function updateWonButtons() {
 // ══════════════════════════════════════════════
 async function fetchTenders(page = 1) {
   const { soha, hudud, search, sort, status } = state.filters;
-  const params = new URLSearchParams({ page, limit:12, soha, hudud, sort });
+  const params = new URLSearchParams({ page, limit: 12 });
+  params.set('soha', soha);
+  params.set('hudud', hudud);
+  params.set('sort', sort);
   if (search) params.set('search', search);
-  if (status !== 'all') params.set('status', status);
+  if (status && status !== 'all') params.set('status', status);
 
   setLoadingTenders(true);
   try {
@@ -384,6 +387,8 @@ function filterTenders() {
   state.filters.hudud  = document.getElementById('filter-hudud')?.value || 'all';
   state.filters.search = document.getElementById('filter-search')?.value || '';
   state.filters.status = document.getElementById('filter-status')?.value || 'all';
+  const sortEl = document.getElementById('filter-sort');
+  if (sortEl) state.filters.sort = sortEl.value;
   state.currentPage = 1;
   fetchTenders(1);
 }
@@ -596,21 +601,24 @@ async function goToStrategyFromTender(id) {
 function showComparisonSelector(tender1Id) {
   hideModal('tender-detail-modal');
   
-  // Show dialog to select tender 2
   const otherTenders = state.tenders.filter(t => t.id !== tender1Id).slice(0, 10);
+  const overlayId = 'cmp-' + Date.now();
   const selectHtml = `
-    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:20px;z-index:10000;max-width:400px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3)">
-      <h3 style="margin:0 0 16px;color:var(--text)">Taqqoslash uchun 2-tender tanlang</h3>
-      <div style="max-height:300px;overflow-y:auto;margin-bottom:16px">
-        ${otherTenders.map(t => `
-          <div onclick="compareTwoTenders('${tender1Id}', '${t.id}');this.closest('div').parentElement.remove()" 
-               style="padding:10px;margin:4px 0;background:var(--bg-2);border-radius:6px;cursor:pointer;border-left:3px solid var(--accent);transition:all 0.2s">
-            <div style="font-size:12px;font-weight:600;color:var(--text)">${t.title.substring(0,50)}...</div>
-            <div style="font-size:11px;color:var(--text-3);margin-top:4px">${t.budget} • ${t.competitors} raqib</div>
-          </div>
-        `).join('')}
+    <div id="${overlayId}" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:10000;background:rgba(0,0,0,0.55)" onclick="if(event.target===this)document.getElementById('${overlayId}').remove()">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:420px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3);max-height:80vh;display:flex;flex-direction:column">
+        <h3 style="margin:0 0 16px;color:var(--text)">Taqqoslash uchun 2-tender tanlang</h3>
+        <div style="max-height:300px;overflow-y:auto;margin-bottom:16px;flex:1">
+          ${otherTenders.map(t => `
+            <div onclick="compareTwoTenders('${tender1Id}', '${t.id}');document.getElementById('${overlayId}').remove()"
+                 style="padding:10px;margin:4px 0;background:var(--bg-2);border-radius:6px;cursor:pointer;border-left:3px solid var(--accent);transition:background 0.2s"
+                 onmouseover="this.style.background='var(--bg-3)'" onmouseout="this.style.background='var(--bg-2)'">
+              <div style="font-size:12px;font-weight:600;color:var(--text)">${t.title.length > 55 ? t.title.substring(0,55)+'...' : t.title}</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:4px">${t.budget} so'm &bull; ${t.competitors} raqib</div>
+            </div>
+          `).join('')}
+        </div>
+        <button onclick="document.getElementById('${overlayId}').remove()" style="width:100%;padding:8px;background:var(--border);color:var(--text);border:none;border-radius:6px;cursor:pointer">Bekor qilish</button>
       </div>
-      <button onclick="this.closest('div').remove()" style="width:100%;padding:8px;background:var(--border);color:var(--text);border:none;border-radius:6px;cursor:pointer">Bekor qilish</button>
     </div>
   `;
   document.body.insertAdjacentHTML('beforeend', selectHtml);
@@ -694,7 +702,7 @@ function renderComparison(t1, t2, comp, aiGenerated) {
   <div style="padding:16px;background:rgba(200,255,0,0.08);border-radius:8px;margin-bottom:20px;border:1px solid rgba(200,255,0,0.2)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px">
       <span>${badge}</span>
-      <span style="color:var(--text-3)">Model: ${aiGenerated ? 'Claude AI' : 'Smart Template'}</span>
+      <span style="color:var(--text-3)">Model: ${aiGenerated ? 'Groq / OpenAI AI' : 'Avtomat shablon'}</span>
     </div>
     <h4 style="margin:0 0 8px;color:var(--text)">📋 Tafsili Taqqoslash</h4>
     <p style="margin:0;font-size:13px;color:var(--text-2);line-height:1.6">${comp.summary || ''}</p>
@@ -1525,7 +1533,7 @@ function animateKPIs() {
 function loadFallbackTenders() {
   // Inline fallback data
   const fallback = [
-    { id:'it-001', soha:'it', hudud:'toshkent', status:'active', isNew:true, title:'Toshkent shahar davlat idoralarini IT infratuzilmasini modernizatsiyalash', budget:'4 200 000 000', budgetRaw:4200000000, probability:87, competitors:3, deadline:'2026-05-28', tags:['Tarmoq','Server','Bulut'], org:'Toshkent shahar hokimiyati' },
+    { id:'it-001', soha:'it', hudud:'toshkent', status:'active', isNew:true, title:'Toshkent shahar davlat idoralarini IT infratuzilmasini modernizatsiyalash', budget:'4 200 000 000', budgetRaw:4200000000, probability:87, competitors:3, deadline:'2026-05-28', postedDate:'2026-03-15', tags:['Tarmoq','Server','Bulut'], org:'Toshkent shahar hokimiyati', description:'Toshkent shahar 47 ta davlat idorasi uchun zamonaviy IT infratuzilma.', requirements:['ISO 27001','5+ yil tajriba'], contactEmail:'it@tashkent.gov.uz', contactPhone:'+998 71 239 01 01' },
     { id:'it-002', soha:'it', hudud:'samarqand', status:'active', isNew:false, title:'Samarqand viloyati elektron hukumat platformasini joriy etish', budget:'2 800 000 000', budgetRaw:2800000000, probability:72, competitors:5, deadline:'2026-05-10', tags:['E-gov','Portal','API'], org:'Samarqand viloyat hokimiyati' },
     { id:'q-001', soha:'qurilish', hudud:'toshkent', status:'active', isNew:false, title:'Toshkent metro liniyasi — yangi bekatlar qurilishi', budget:'12 800 000 000', budgetRaw:12800000000, probability:45, competitors:12, deadline:'2026-04-15', tags:['Yer osti','Beton','Infra'], org:"O'zbekiston Temir Yo'llari" },
     { id:'t-001', soha:'tibbiyot', hudud:'namangan', status:'active', isNew:false, title:'Namangan viloyati shifoxonalari uchun tibbiy jihozlar yetkazib berish', budget:'2 100 000 000', budgetRaw:2100000000, probability:81, competitors:4, deadline:'2026-04-30', tags:['Jihozlar','MRI','Laboratoriya'], org:"Sog'liqni Saqlash Vazirligi" },
@@ -1698,7 +1706,7 @@ function appendChatMessage(role, text, aiGenerated = false) {
       <div class="ai-msg-avatar">🤖</div>
       <div class="ai-msg-bubble">
         ${formatted}
-        ${aiGenerated !== false ? '<div class="ai-badge">✨ Claude AI</div>' : '<div class="ai-badge demo">📴 API yo‘q — qisqa javob</div>'}
+        ${aiGenerated !== false ? '<div class="ai-badge">✨ AI tomonidan</div>' : '<div class="ai-badge demo">📴 Demo rejim</div>'}
       </div>`;
   }
 

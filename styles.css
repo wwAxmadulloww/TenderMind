@@ -138,6 +138,16 @@ body {
 }
 .logo-icon { color: var(--accent); font-size: 22px; }
 .logo-text { background: linear-gradient(135deg, #fff 0%, var(--accent) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.nav-logo-img {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(200,255,0,0.3));
+  transition: filter 0.2s ease;
+}
+.nav-logo:hover .nav-logo-img {
+  filter: drop-shadow(0 0 12px rgba(200,255,0,0.6));
+}
 .nav-links { display: flex; gap: 32px; }
 .nav-link {
   color: var(--text-2);
