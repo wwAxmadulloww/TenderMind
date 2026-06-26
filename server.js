@@ -22,17 +22,18 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const OpenAI = require('openai').default || require('openai');
 const logger = require('./logger');
 const { validateBody, sanitizeBody, normalizeUzbekPhone } = require('./validators');
-const { connectDB, User, mongoose } = require('./db');
+const config = require('./config');
+const { corsOptions } = require('./config/cors');
+const { connectDB, isDBConnected, User, mongoose } = require('./db');
+const tenderRepository = require('./repositories/tenderRepository');
+const aiManager = require('./services/ai');
+const { authMiddleware } = require('./middleware/auth');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-const isProd = process.env.NODE_ENV === 'production';
+const PORT = config.port;
+const isProd = config.isProd;
 
-// ── MongoDB o'rnatilishi ─────────────────────────────────────────────────
-// Local db.json endi ishlatilmaydi, MongoDB orqali ma'lumotlar boshqariladi.
-connectDB();
-
-let JWT_SECRET = process.env.JWT_SECRET && String(process.env.JWT_SECRET).trim();
+let JWT_SECRET = config.jwtSecret;
 if (!JWT_SECRET) {
   if (isProd) {
     logger.error('JWT_SECRET muhit o\'zgaruvchisi productionda majburiy');
@@ -86,7 +87,7 @@ function getGeminiApiKey() {
 
 /** AI sozlanganmi tekshirish */
 function isGeminiConfigured() {
-  return getGroqApiKey().length >= 20 || getOpenAIApiKey().length >= 20 || getGeminiApiKey().length >= 20;
+  return aiManager.isConfigured();
 }
 
 /** Groq orqali matn generatsiya (bepul, OpenAI-compatible) */
@@ -140,63 +141,12 @@ async function geminiGenerateFallback(prompt, systemInstruction) {
 
 /** Asosiy AI matn generatsiya funksiyasi — Groq (bepul) → OpenAI → Gemini */
 async function geminiGenerate(prompt, systemInstruction, _modelName) {
-  if (getGroqApiKey().length >= 20) {
-    return groqGenerate(prompt, systemInstruction);
-  }
-  if (getOpenAIApiKey().length >= 20) {
-    return openAIGenerate(prompt, systemInstruction);
-  }
-  return geminiGenerateFallback(prompt, systemInstruction);
+  return aiManager.generate(prompt, systemInstruction);
 }
 
 /** AI chat sessiyasi — Groq (bepul) → OpenAI → Gemini */
 async function geminiChat(systemInstruction, history, userMessage) {
-  // Groq primary (bepul)
-  if (getGroqApiKey().length >= 20) {
-    const client = new OpenAI({
-      apiKey: getGroqApiKey(),
-      baseURL: 'https://api.groq.com/openai/v1',
-    });
-    const messages = [];
-    if (systemInstruction) messages.push({ role: 'system', content: systemInstruction });
-    for (const h of (history || [])) {
-      messages.push({ role: h.role === 'model' ? 'assistant' : 'user', content: h.parts[0].text });
-    }
-    messages.push({ role: 'user', content: userMessage });
-    const response = await client.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages,
-      max_tokens: 4000,
-      temperature: 0.8,
-    });
-    return response.choices[0].message.content;
-  }
-  // OpenAI fallback
-  if (getOpenAIApiKey().length >= 20) {
-    const client = new OpenAI({ apiKey: getOpenAIApiKey() });
-    const messages = [];
-    if (systemInstruction) messages.push({ role: 'system', content: systemInstruction });
-    for (const h of (history || [])) {
-      messages.push({ role: h.role === 'model' ? 'assistant' : 'user', content: h.parts[0].text });
-    }
-    messages.push({ role: 'user', content: userMessage });
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages,
-      max_tokens: 4000,
-      temperature: 0.8,
-    });
-    return response.choices[0].message.content;
-  }
-  // Gemini last fallback
-  const genAI = new GoogleGenerativeAI(getGeminiApiKey());
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    ...(systemInstruction ? { systemInstruction } : {}),
-  });
-  const chat = model.startChat({ history: history || [] });
-  const result = await chat.sendMessage(userMessage);
-  return result.response.text();
+  return aiManager.chat(systemInstruction, history, userMessage);
 }
 
 /** AI matnlarida qatorlarni ajratish (\\n literal va CRLF) */
@@ -224,20 +174,7 @@ const ALLOWED_ORIGINS = [
   'https://www.tendermind.uz',
 ].filter(Boolean);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // No origin = server-to-server yoki curl — ruxsat
-    if (!origin) return callback(null, true);
-    if (!isProd) return callback(null, true); // Dev da hamma
-    // Render ichki domenlar uchun
-    if (origin.endsWith('.onrender.com')) return callback(null, true);
-    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-    logger.warn(`CORS rejected origin: ${origin}`);
-    // Production da ham permissive bo'lsin (xarid.uz embeds uchun)
-    callback(null, true);
-  },
-  credentials: true
-}));
+app.use(cors(corsOptions()));
 
 app.use(express.json({ limit: '2mb' }));
 
@@ -277,425 +214,30 @@ app.use('/api/strategy', aiLimiter);
 
 
 
-// ── Auth Middleware ───────────────────────────────────────────────────
-function authMiddleware(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader) return res.status(401).json({ error: 'Token talab qilinadi' });
-  const token = authHeader.split(' ')[1];
-  try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch {
-    res.status(401).json({ error: 'Yaroqsiz token' });
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════
-// TENDERS DATA (50+ ta real tenderlar)
-// ══════════════════════════════════════════════════════════════════════
-const TENDERS_DB = [
-  // ── IT ──────────────────────────────────────────────────────────────
-  {
-    id: 'it-001', soha: 'it', hudud: 'toshkent', status: 'active', isNew: true,
-    title: 'Toshkent shahar davlat idoralarini IT infratuzilmasini modernizatsiyalash',
-    budget: '4 200 000 000', budgetRaw: 4200000000, probability: 87, competitors: 3,
-    deadline: '2026-05-28', postedDate: '2026-03-15',
-    tags: ['Tarmoq', 'Server', 'Bulut'], org: 'Toshkent shahar hokimiyati',
-    description: 'Toshkent shahar 47 ta davlat idorasi uchun zamonaviy IT infratuzilma: fiber optik tarmoq, bulut serverlar, kiberxavfsizlik tizimi.',
-    requirements: ['ISO 27001 sertifikati', '5+ yillik tajriba', '200+ xodim'],
-    contactEmail: 'it@tashkent.gov.uz', contactPhone: '+998 71 239 01 01'
-  },
-
-  {
-    id: 'it-002', soha: 'it', hudud: 'samarqand', status: 'active', isNew: false,
-    title: 'Samarqand viloyati elektron hukumat platformasini joriy etish',
-    budget: '2 800 000 000', budgetRaw: 2800000000, probability: 72, competitors: 5,
-    deadline: '2026-05-10', postedDate: '2026-03-10',
-    tags: ['E-gov', 'Portal', 'API'], org: 'Samarqand viloyat hokimiyati',
-    description: 'Fuqarolar uchun 120+ ta davlat xizmati online platformasi. Mobile app + web portal.',
-    requirements: ['E-gov tajribasi', 'REST API', 'Mobile dev'],
-    contactEmail: 'egov@samarkand.gov.uz', contactPhone: '+998 66 234 00 00'
-  },
-
-  {
-    id: 'it-003', soha: 'it', hudud: 'namangan', status: 'active', isNew: false,
-    title: 'Namangan shahar kuzatuv kamera tizimini o\'rnatish',
-    budget: '1 500 000 000', budgetRaw: 1500000000, probability: 63, competitors: 7,
-    deadline: '2026-05-20', postedDate: '2026-03-05',
-    tags: ['Kamera', 'Xavfsizlik', 'AI'], org: 'Namangan shahar IIB',
-    description: '500+ ta HD kuzatuv kamera, AI yuz tanish tizimi, 24/7 monitoring markazi.',
-    requirements: ['Xavfsizlik litsenziyasi', 'AI/ML tajriba'],
-    contactEmail: 'info@namangan-iib.uz', contactPhone: '+998 69 222 00 00'
-  },
-
-  {
-    id: 'it-004', soha: 'it', hudud: 'andijon', status: 'active', isNew: true,
-    title: 'Andijon viloyati tibbiyot axborot tizimini modernizatsiyalash (MIS)',
-    budget: '1 800 000 000', budgetRaw: 1800000000, probability: 79, competitors: 4,
-    deadline: '2026-06-10', postedDate: '2026-03-20',
-    tags: ['MIS', 'EMR', 'HL7'], org: 'Andijon Tibbiyot Boshqarmasi',
-    description: '40+ poliklinika va kasalxona uchun yagona tibbiy axborot tizimi: elektron tibbiy karta, laboratoriya, aptek moduli.',
-    requirements: ['Tibbiy dasturiy ta\'minot tajribasi', 'HL7 FHIR', 'Postgres'],
-    contactEmail: 'mis@andijan-health.uz', contactPhone: '+998 74 223 00 00'
-  },
-
-  {
-    id: 'it-005', soha: 'it', hudud: 'fargona', status: 'active', isNew: false,
-    title: 'Farg\'ona viloyati soliq inspeksiyasi uchun CRM tizimi',
-    budget: '950 000 000', budgetRaw: 950000000, probability: 68, competitors: 6,
-    deadline: '2026-06-01', postedDate: '2026-03-18',
-    tags: ['CRM', 'Soliq', 'Dashboard'], org: 'Farg\'ona Soliq Boshqarmasi',
-    description: 'Soliq to\'lovchilar bilan ishlash uchun CRM, avtomatik hisobot, analytics dashboard.',
-    requirements: ['CRM tajribasi', 'React yoki Vue.js', 'PostgreSQL'],
-    contactEmail: 'crm@fergana-tax.uz', contactPhone: '+998 73 241 00 00'
-  },
-
-  {
-    id: 'it-006', soha: 'it', hudud: 'toshkent', status: 'urgent', isNew: true,
-    title: 'Toshkent metro kartasi va to\'lov tizimini yangilash',
-    budget: '3 600 000 000', budgetRaw: 3600000000, probability: 55, competitors: 9,
-    deadline: '2026-04-20', postedDate: '2026-03-25',
-    tags: ['NFC', 'Contactless', 'Payment'], org: 'Toshkent Metro',
-    description: 'Barcha stantsiyalarga NFC kontaktsiz to\'lov va QR kod tizimi o\'rnatish. 30+ stantsiya.',
-    requirements: ['PCI DSS sertifikati', 'NFC tajriba', 'Banking protocol'],
-    contactEmail: 'tender@tashkent-metro.uz', contactPhone: '+998 71 244 00 00'
-  },
-
-  // ── QURILISH ─────────────────────────────────────────────────────────
-  {
-    id: 'q-001', soha: 'qurilish', hudud: 'toshkent', status: 'active', isNew: false,
-    title: 'Toshkent metro liniyasi — yangi bekatlar qurilishi',
-    budget: '12 800 000 000', budgetRaw: 12800000000, probability: 45, competitors: 12,
-    deadline: '2026-04-15', postedDate: '2026-02-01',
-    tags: ['Yer osti', 'Beton', 'Infra'], org: 'O\'zbekiston Temir Yo\'llari',
-    description: 'M3 liniyasi: 6 ta yangi bekat, 8.5 km tunnel. Loyiha muddati 36 oy.',
-    requirements: ['TBM tajribasi', 'ISO 9001', '500+ xodim', '5 mlrd kafolat'],
-    contactEmail: 'tender@uzmetro.uz', contactPhone: '+998 71 299 00 00'
-  },
-
-  {
-    id: 'q-002', soha: 'qurilish', hudud: 'andijon', status: 'active', isNew: false,
-    title: 'Andijon viloyati yo\'l ta\'miri va qoplama yotqizish',
-    budget: '7 500 000 000', budgetRaw: 7500000000, probability: 68, competitors: 4,
-    deadline: '2026-05-05', postedDate: '2026-02-15',
-    tags: ['Asfalt', 'Yo\'l', 'Region'], org: 'Andijon Avtomobil Yo\'llari',
-    description: '120 km shaharlararo yo\'l ta\'miri va yangi asfalt qoplama. Andijо viloyati davlat yo\'llari.',
-    requirements: ['Yo\'l qurilish litsenziyasi', 'GOST standartlar', 'Asfalt zavodi'],
-    contactEmail: 'tender@andijan-roads.uz', contactPhone: '+998 74 225 00 00'
-  },
-
-  {
-    id: 'q-003', soha: 'qurilish', hudud: 'buxoro', status: 'active', isNew: true,
-    title: 'Buxoro shahrini obodonlashtirish — markaziy maydon rekonstruksiyasi',
-    budget: '3 200 000 000', budgetRaw: 3200000000, probability: 79, competitors: 3,
-    deadline: '2026-05-25', postedDate: '2026-03-01',
-    tags: ['Obodon', 'Landshaft', 'Meros'], org: 'Buxoro shahar hokimiyati',
-    description: 'Labi-Hovuz maydonini rekonstruksiya: yo\'lak, chiroqlar, suv fontan, daraxt ekish.',
-    requirements: ['Landshaft dizayn tajribasi', 'UNESCO koordinatsiya'],
-    contactEmail: 'obod@bukhara.gov.uz', contactPhone: '+998 65 223 00 00'
-  },
-
-  {
-    id: 'q-004', soha: 'qurilish', hudud: 'samarqand', status: 'active', isNew: true,
-    title: 'Samarqand xalqaro aeroporti kengaytirish loyihasi — 2-terminal',
-    budget: '28 000 000 000', budgetRaw: 28000000000, probability: 38, competitors: 15,
-    deadline: '2026-04-30', postedDate: '2026-02-20',
-    tags: ['Aeroport', 'Terminal', 'Infra'], org: 'O\'zbekiston Havo Yo\'llari',
-    description: 'Yangi terminal: 2000 kv.m yo\'lovchi zali, 10 ta yo\'lakcha, 5 yulduzli VIP lounge.',
-    requirements: ['ICAO standartlar', 'Xalqaro qurilish tajriba', '10 mlrd kafolat'],
-    contactEmail: 'tender@uzairways.uz', contactPhone: '+998 71 140 00 00'
-  },
-
-  {
-    id: 'q-005', soha: 'qurilish', hudud: 'namangan', status: 'urgent', isNew: false,
-    title: 'Namangan viloyati qishloq xo\'jaligi irrigatsiya tizimi',
-    budget: '5 100 000 000', budgetRaw: 5100000000, probability: 71, competitors: 5,
-    deadline: '2026-04-18', postedDate: '2026-03-10',
-    tags: ['Irrigatsiya', 'Kanal', 'Suv'], org: 'Suvxo\'jalik Vazirligi',
-    description: '45 km yangi kanal tizimi, 8 ta nasos stantsiyasi, 12,000 gektar yer sug\'orish.',
-    requirements: ['Gidroinjenerlik litsenziyasi', 'Suvxo\'jalik tajribasi'],
-    contactEmail: 'tender@suv.gov.uz', contactPhone: '+998 71 239 00 00'
-  },
-
-  {
-    id: 'q-006', soha: 'qurilish', hudud: 'qashqadaryo', status: 'active', isNew: false,
-    title: 'Qarshi shahri ko\'p qavatli uy-joy majmuasi qurilishi',
-    budget: '9 500 000 000', budgetRaw: 9500000000, probability: 53, competitors: 8,
-    deadline: '2026-05-30', postedDate: '2026-03-05',
-    tags: ['Uy-joy', 'Ko\'p qavatli', 'Prefab'], org: 'Qashqadaryo Qurilish Boshqarmasi',
-    description: '800 xonadon, 5 ta 12 qavatli bino, yer osti avtoturargoh, ko\'kalamzor.',
-    requirements: ['Ko\'p qavatli qurilish tajribasi', 'Bank kafolati 2 mlrd'],
-    contactEmail: 'qurilish@qashkadaryo.gov.uz', contactPhone: '+998 75 221 00 00'
-  },
-
-  // ── TIBBIYOT ─────────────────────────────────────────────────────────
-  {
-    id: 't-001', soha: 'tibbiyot', hudud: 'namangan', status: 'active', isNew: false,
-    title: 'Namangan viloyati shifoxonalari uchun tibbiy jihozlar yetkazib berish',
-    budget: '2 100 000 000', budgetRaw: 2100000000, probability: 81, competitors: 4,
-    deadline: '2026-04-30', postedDate: '2026-03-01',
-    tags: ['Jihozlar', 'MRI', 'Laboratoriya'], org: 'Sog\'liqni Saqlash Vazirligi',
-    description: '3 ta kasalxona uchun MRI 1.5T, KT skaner, laparoskopik uskunalar, laboratoriya kompleksi.',
-    requirements: ['Tibbiy qurilma sertifikati', 'CE/FDA', 'Servis kafolati 5 yil'],
-    contactEmail: 'jihozlar@ssv.gov.uz', contactPhone: '+998 71 214 00 00'
-  },
-
-  {
-    id: 't-002', soha: 'tibbiyot', hudud: 'qashqadaryo', status: 'active', isNew: false,
-    title: 'Qashqadaryo viloyati klinik diagnostika markazini jihozlash',
-    budget: '980 000 000', budgetRaw: 980000000, probability: 74, competitors: 6,
-    deadline: '2026-05-15', postedDate: '2026-03-08',
-    tags: ['Diagnostika', 'PCR', 'Ultratovush'], org: 'Qashqadaryo SSB',
-    description: 'PCR laboratoriya, 5 ta ultratovush apparati, bioximiya analizatori, hematologiya.',
-    requirements: ['ISO 15189 tajriba', 'CE sertifikat', 'Reagentlar ta\'minoti'],
-    contactEmail: 'lab@qashkadaryo-ssb.uz', contactPhone: '+998 75 221 55 00'
-  },
-
-  {
-    id: 't-003', soha: 'tibbiyot', hudud: 'toshkent', status: 'urgent', isNew: true,
-    title: 'Respublika shoshilinch tibbiy yordam markazi uchun reanimatsiya jihozlari',
-    budget: '4 500 000 000', budgetRaw: 4500000000, probability: 76, competitors: 5,
-    deadline: '2026-04-22', postedDate: '2026-03-22',
-    tags: ['Reanimatsiya', 'Ventilatsiya', 'Monitoring'], org: 'Sog\'liqni Saqlash Vazirligi',
-    description: '50 ta ICU karavot, sun\'iy nafas oldirish, neinvaziv monitoring, defibrillatorlar.',
-    requirements: ['CE/FDA', 'Xalqaro tibbiy kompaniya', '10 yil servis'],
-    contactEmail: 'reanm@ssv.gov.uz', contactPhone: '+998 71 214 11 00'
-  },
-
-  {
-    id: 't-004', soha: 'tibbiyot', hudud: 'fargona', status: 'active', isNew: false,
-    title: 'Farg\'ona shahar onkologiya markazi qurilishi va jihozlanishi',
-    budget: '15 000 000 000', budgetRaw: 15000000000, probability: 42, competitors: 10,
-    deadline: '2026-06-15', postedDate: '2026-02-28',
-    tags: ['Onkologiya', 'Radiologiya', 'Kimyoterapiya'], org: 'Sog\'liqni Saqlash Vazirligi',
-    description: '100 o\'rinlik onkologiya markazi: proton terapiya, PET-CT, operatsiya bloklari.',
-    requirements: ['Tibbiy qurilish tajribasi', 'Xalqaro sherikor', '20 mlrd kafolat'],
-    contactEmail: 'onko@ssv.gov.uz', contactPhone: '+998 71 214 22 00'
-  },
-
-  // ── OZIQ-OVQAT ───────────────────────────────────────────────────────
-  {
-    id: 'o-001', soha: 'oziq', hudud: 'fargona', status: 'active', isNew: false,
-    title: 'Farg\'ona viloyati maktablari uchun ovqatlanish xizmatini ko\'rsatish',
-    budget: '890 000 000', budgetRaw: 890000000, probability: 88, competitors: 2,
-    deadline: '2026-04-20', postedDate: '2026-03-12',
-    tags: ['Maktab', 'Ovqat', 'HACCP'], org: 'Farg\'ona Xalq Ta\'limi Boshqarmasi',
-    description: '120 ta maktab, 85,000 o\'quvchi uchun kun bo\'yi 3 mahal ovqat. 12 oylik shartnoma.',
-    requirements: ['HACCP sertifikati', '3+ yil tajriba', 'Sanitariya ruxsati'],
-    contactEmail: 'oziq@fergana-edu.uz', contactPhone: '+998 73 244 00 00'
-  },
-
-  {
-    id: 'o-002', soha: 'oziq', hudud: 'samarqand', status: 'active', isNew: false,
-    title: 'Samarqand viloyati kasalxonalari uchun dieta ovqatlari yetkazish',
-    budget: '650 000 000', budgetRaw: 650000000, probability: 91, competitors: 2,
-    deadline: '2026-05-01', postedDate: '2026-03-15',
-    tags: ['Dieta', 'Kasalxona', 'ISO22000'], org: 'Samarqand SSB',
-    description: '8 ta kasalxona, 1200 karavot uchun kuniga 3 mahal dieta ovqat. 6 oylik shartnoma.',
-    requirements: ['ISO 22000', 'Tibbiy dieta tajribasi', 'Laboratoriya sertifikati'],
-    contactEmail: 'ovqat@samarkand-ssb.uz', contactPhone: '+998 66 235 00 00'
-  },
-
-  {
-    id: 'o-003', soha: 'oziq', hudud: 'toshkent', status: 'active', isNew: true,
-    title: 'Toshkent shahar harbiy qismlar uchun oziq-ovqat ta\'minoti',
-    budget: '2 200 000 000', budgetRaw: 2200000000, probability: 65, competitors: 5,
-    deadline: '2026-05-10', postedDate: '2026-03-20',
-    tags: ['Harbiy', 'Konsерva', 'Logistika'], org: 'Mudofaa Vazirligi',
-    description: '12,000 nafar harbiy xizmatchi uchun yillik oziq-ovqat ta\'minoti: donli, go\'shtli, sabzavotli.',
-    requirements: ['Harbiy ruxsatnoma', 'GOST standart', 'Maxfiylik shartnoma'],
-    contactEmail: 'harbiy-tender@mod.uz', contactPhone: '+998 71 220 00 00'
-  },
-
-  {
-    id: 'o-004', soha: 'oziq', hudud: 'buxoro', status: 'active', isNew: false,
-    title: 'Buxoro viloyati DYO bolalar muassasalari uchun oziq-ovqat',
-    budget: '380 000 000', budgetRaw: 380000000, probability: 85, competitors: 3,
-    deadline: '2026-04-25', postedDate: '2026-03-18',
-    tags: ['Bolalar', 'Bog\'cha', 'Organik'], org: 'Buxoro Xalq Ta\'limi',
-    description: '35 ta bog\'cha, 4500 bola uchun kunlik oziq-ovqat. Organik, sifatli mahsulotlar.',
-    requirements: ['Bolalar oziq-ovqat sertifikati', 'HACCP', 'Tashish transport'],
-    contactEmail: 'ovqat@bukhara-edu.uz', contactPhone: '+998 65 225 00 00'
-  },
-
-  // ── TRANSPORT ─────────────────────────────────────────────────────────
-  {
-    id: 'tr-001', soha: 'transport', hudud: 'qashqadaryo', status: 'active', isNew: false,
-    title: 'Qashqadaryo viloyati shaharlararo avtobus xizmati konsessiyasi',
-    budget: '3 400 000 000', budgetRaw: 3400000000, probability: 55, competitors: 8,
-    deadline: '2026-05-12', postedDate: '2026-03-01',
-    tags: ['Avtobus', 'Marshurt', 'GPS'], org: 'Qashqadaryo Hudud Transport',
-    description: '15 ta marshrut, 80 ta yangi avtobus (Yutong/Higer), real-time GPS monitoring, plastik karta to\'lov.',
-    requirements: ['Transport litsenziyasi', 'GPS tizim', '5+ yil tajriba'],
-    contactEmail: 'transport@qashkadaryo.gov.uz', contactPhone: '+998 75 222 00 00'
-  },
-
-  {
-    id: 'tr-002', soha: 'transport', hudud: 'toshkent', status: 'active', isNew: true,
-    title: 'Toshkent shahri elektr avtobuslar parki shakllantirish',
-    budget: '18 500 000 000', budgetRaw: 18500000000, probability: 47, competitors: 11,
-    deadline: '2026-06-01', postedDate: '2026-03-25',
-    tags: ['Elektr', 'EV Bus', 'Charging'], org: 'Toshkent Shahar Transport',
-    description: '200 ta elektr avtobus, 20 ta zaryadlash stantsiyasi, 5 ta depo modernizatsiyasi.',
-    requirements: ['EV tajriba', 'Xитой/Korea zavod', 'Servis markazi'],
-    contactEmail: 'ev@tashkent-transport.uz', contactPhone: '+998 71 244 55 00'
-  },
-
-  {
-    id: 'tr-003', soha: 'transport', hudud: 'samarqand', status: 'urgent', isNew: false,
-    title: 'Samarqand xalqaro aeroportiga tez yo\'l qurilishi',
-    budget: '22 000 000 000', budgetRaw: 22000000000, probability: 41, competitors: 13,
-    deadline: '2026-04-28', postedDate: '2026-02-10',
-    tags: ['Yo\'l', 'Aeroport', '4-yo\'l'], org: 'Yo\'l Qurilish Vazirligi',
-    description: '12 km 4 yo\'lakli magistral yo\'l, 2 ta ko\'prik, 3 ta yo\'l-yo\'l almashinuvi.',
-    requirements: ['Magistral yo\'l tajribasi', '250+ xodim', 'Uyma-uyma texnika'],
-    contactEmail: 'aeroport-road@yolqurilish.uz', contactPhone: '+998 71 238 00 00'
-  },
-
-  // ── TA\'LIM ────────────────────────────────────────────────────────────
-  {
-    id: 'ta-001', soha: 'talim', hudud: 'buxoro', status: 'active', isNew: false,
-    title: 'Buxoro viloyati maktablari uchun ta\'lim texnologiyalari va interaktiv doskalar',
-    budget: '890 000 000', budgetRaw: 890000000, probability: 82, competitors: 3,
-    deadline: '2026-04-22', postedDate: '2026-03-10',
-    tags: ['EdTech', 'Doska', 'Tablet'], org: 'Buxoro Xalq Ta\'limi',
-    description: '150 ta maktabga interaktiv doskalar, 3000 ta o\'quvchi plansheti, LMS platform.',
-    requirements: ['EdTech tajribasi', 'Mahalliy texnik qo\'llab-quvvatlash', 'Warranty 3 yil'],
-    contactEmail: 'edtech@bukhara-edu.uz', contactPhone: '+998 65 224 00 00'
-  },
-
-  {
-    id: 'ta-002', soha: 'talim', hudud: 'toshkent', status: 'active', isNew: false,
-    title: 'Toshkent shahri maktab kutubxonalari uchun elektron kitoblar platformasi',
-    budget: '540 000 000', budgetRaw: 540000000, probability: 76, competitors: 5,
-    deadline: '2026-06-01', postedDate: '2026-03-15',
-    tags: ['E-kitob', 'Platform', 'API'], org: 'Toshkent Xalq Ta\'limi',
-    description: '200,000+ elektron kitob, 300 ta maktab, offline rejim, o\'qituvchi va o\'quvchi profili.',
-    requirements: ['Digital publishing tajriba', 'Mobile app (iOS/Android)', 'Mualliflik huquqlari'],
-    contactEmail: 'ekitob@tashkent-edu.uz', contactPhone: '+998 71 239 55 00'
-  },
-
-  {
-    id: 'ta-003', soha: 'talim', hudud: 'andijon', status: 'active', isNew: false,
-    title: 'Andijon viloyati kasb-hunar maktablari uchun asbob-uskunalar',
-    budget: '1 200 000 000', budgetRaw: 1200000000, probability: 69, competitors: 6,
-    deadline: '2026-05-18', postedDate: '2026-03-08',
-    tags: ['KHM', 'Stanok', 'Asbob'], org: 'Andijon Kasb-Hunar Ta\'lim',
-    description: '25 ta KHM uchun CNC dastgohlar, elektr uskunalar, Arduino laboratoriyalar, tikuvchilik mashinalari.',
-    requirements: ['Ta\'lim uskunalari litsenziyasi', 'Texnik training', 'Zapchastlar ta\'minot'],
-    contactEmail: 'khm@andijan-edu.uz', contactPhone: '+998 74 226 00 00'
-  },
-
-  {
-    id: 'ta-004', soha: 'talim', hudud: 'namangan', status: 'active', isNew: true,
-    title: 'Namangan IT Park — dasturlash o\'quv markazi jihozlash',
-    budget: '750 000 000', budgetRaw: 750000000, probability: 84, competitors: 3,
-    deadline: '2026-05-05', postedDate: '2026-03-22',
-    tags: ['IT Park', 'Server', 'Mac'], org: 'IT Park O\'zbekiston',
-    description: '300 xonali o\'quv sinf: Mac/Windows kompyuterlар, server lab, AI/ML workstation.',
-    requirements: ['Apple reseller yoki HP/Dell', 'Tarmoq muhendisi', '3 yil kafolat'],
-    contactEmail: 'tender@itpark.uz', contactPhone: '+998 71 202 00 00'
-  },
-
-  {
-    id: 'ta-005', soha: 'talim', hudud: 'fargona', status: 'active', isNew: false,
-    title: 'Farg\'ona viloyati ingliz tili markazlari uchun audio-video qo\'llanmalar',
-    budget: '320 000 000', budgetRaw: 320000000, probability: 77, competitors: 4,
-    deadline: '2026-05-20', postedDate: '2026-03-12',
-    tags: ['Ingliz tili', 'IELTS', 'Multimedia'], org: 'Farg\'ona Xalq Ta\'limi',
-    description: '50 ta ingliz tili markazi uchun: Smart TV, audio sistema, IELTS tayyorlash materiallari.',
-    requirements: ['Multimedia jihozlar', 'Ta\'lim kontenti', 'Kafedra tavsiyasi'],
-    contactEmail: 'ingliz@fergana-edu.uz', contactPhone: '+998 73 245 00 00'
-  },
-
-  // ── EKOLOGIYA ────────────────────────────────────────────────────────
-  {
-    id: 'ek-001', soha: 'ekologiya', hudud: 'toshkent', status: 'active', isNew: true,
-    title: 'Toshkent shahar chiqindilarni qayta ishlash zavodi',
-    budget: '35 000 000 000', budgetRaw: 35000000000, probability: 32, competitors: 18,
-    deadline: '2026-06-01', postedDate: '2026-03-01',
-    tags: ['Recycling', 'Zavodla', 'Ekologiya'], org: 'Ekologiya Vazirligi',
-    description: 'Kuniga 1500 tonna chiqindi qayta ishlash zavodi. Plastik, metal, qog\'oz qabul markazlari.',
-    requirements: ['Zavodchilik tajribasi', 'EU standartlar', '50 mlrd kafolat'],
-    contactEmail: 'tender@ekologiya.gov.uz', contactPhone: '+998 71 200 88 00'
-  },
-
-  {
-    id: 'ek-002', soha: 'ekologiya', hudud: 'buxoro', status: 'active', isNew: false,
-    title: 'Buxoro viloyati quyosh energiyasi stantsiyasi (50 MVt)',
-    budget: '42 000 000 000', budgetRaw: 42000000000, probability: 28, competitors: 20,
-    deadline: '2026-05-25', postedDate: '2026-02-15',
-    tags: ['Quyosh', 'Solar', 'Energiya'], org: 'Energetika Vazirligi',
-    description: '50 MVt quvvatli quyosh elektr stantsiyasi, transformator, 110 kV tarmoq ulash.',
-    requirements: ['Xalqaro solar tajriba', 'IFC/EBRD moliyasi', 'EPC shartnoma'],
-    contactEmail: 'solar@energetika.gov.uz', contactPhone: '+998 71 238 55 00'
-  },
-
-  // ── QISHLOQ XO\'JALIGI ────────────────────────────────────────────────
-  {
-    id: 'qx-001', soha: 'qishloq', hudud: 'xorazm', status: 'active', isNew: true,
-    title: 'Xorazm viloyati dehqonchilik uchun smart agro texnologiyalari',
-    budget: '1 600 000 000', budgetRaw: 1600000000, probability: 73, competitors: 4,
-    deadline: '2026-05-15', postedDate: '2026-03-20',
-    tags: ['Smart Agro', 'Drone', 'IoT'], org: 'Qishloq Xo\'jalik Vazirligi',
-    description: 'Dron purkash tizimi, IoT namlik sensori, avtomatik sug\'orish, agro monitoring platform.',
-    requirements: ['Agro-tech tajribasi', 'Drone litsenziyasi', 'IoT platforma'],
-    contactEmail: 'agro@qxv.gov.uz', contactPhone: '+998 71 239 77 00'
-  },
-
-  {
-    id: 'qx-002', soha: 'qishloq', hudud: 'surxondaryo', status: 'active', isNew: false,
-    title: 'Surxondaryo viloyati issiqxona kompleksi qurilishi',
-    budget: '2 800 000 000', budgetRaw: 2800000000, probability: 61, competitors: 7,
-    deadline: '2026-05-30', postedDate: '2026-03-05',
-    tags: ['Issiqxona', 'Gidroponik', 'Export'], org: 'Qishloq Xo\'jalik Vazirligi',
-    description: '20 gektar zamonaviy Venlo-tip issiqxona, gidroponik tizim, sovutgich omborlar.',
-    requirements: ['Issiqxona qurilish tajribasi', 'Export sertifikati', 'Netherlands standart'],
-    contactEmail: 'issiqxona@qxv.gov.uz', contactPhone: '+998 71 239 88 00'
-  },
-];
-
 // ══════════════════════════════════════════════════════════════════════
 // API ROUTES
+// Tender data is loaded from MongoDB via repositories/tenderRepository.js.
+// Seed data lives in seed-tenders.js.
 // ══════════════════════════════════════════════════════════════════════
 
 // ── GET /api/tenders ─────────────────────────────────────────────────
-app.get('/api/tenders', (req, res) => {
-  let { soha, hudud, search, sort, page, limit, status } = req.query;
-  page = Math.max(1, parseInt(page) || 1);
-  limit = Math.min(50, parseInt(limit) || 12);
-
-  let list = [...TENDERS_DB];
-
-  if (soha && soha !== 'all') list = list.filter(t => t.soha === soha);
-  if (hudud && hudud !== 'all') list = list.filter(t => t.hudud === hudud);
-  if (status && status !== 'all') list = list.filter(t => t.status === status);
-  if (search) {
-    const q = search.toLowerCase();
-    list = list.filter(t =>
-      t.title.toLowerCase().includes(q) ||
-      t.org.toLowerCase().includes(q) ||
-      t.tags.some(tag => tag.toLowerCase().includes(q))
-    );
+app.get('/api/tenders', async (req, res, next) => {
+  try {
+    res.json(await tenderRepository.list(req.query));
+  } catch (err) {
+    next(err);
   }
-
-  if (sort === 'budget') list.sort((a, b) => b.budgetRaw - a.budgetRaw);
-  else if (sort === 'date') list.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
-  else if (sort === 'newest') list.sort((a, b) => new Date(b.postedDate) - new Date(a.postedDate));
-  else list.sort((a, b) => b.probability - a.probability);
-
-  const total = list.length;
-  const start = (page - 1) * limit;
-  const items = list.slice(start, start + limit);
-
-  res.json({ total, page, limit, pages: Math.ceil(total / limit), items });
 });
 
 // ── GET /api/tenders/:id ─────────────────────────────────────────────
-app.get('/api/tenders/:id', (req, res) => {
-  const t = TENDERS_DB.find(x => x.id === req.params.id);
+app.get('/api/tenders/:id', async (req, res, next) => {
+  try {
+  const t = await tenderRepository.findById(req.params.id);
   if (!t) return res.status(404).json({ error: 'Tender topilmadi' });
   res.json(t);
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ── POST /api/generate (7 ta O'zbekiston tender hujjati) ────────────
@@ -781,11 +323,12 @@ JSON formatda qaytar (faqat JSON, boshqa hech narsa yo'q):
 });
 
 // ── POST /api/strategy ───────────────────────────────────────────────
-app.post('/api/strategy', async (req, res) => {
+app.post('/api/strategy', async (req, res, next) => {
+  try {
   const { tenderId, company, experience } = req.body;
   if (!tenderId) return res.status(400).json({ error: 'tenderId talab qilinadi' });
 
-  const tender = TENDERS_DB.find(t => t.id === tenderId);
+  const tender = await tenderRepository.findById(tenderId);
   if (!tender) return res.status(404).json({ error: 'Tender topilmadi' });
 
   if (!isGeminiConfigured()) {
@@ -852,6 +395,9 @@ JSON formatda qaytаr:
       strategy: generateFallbackStrategy(tender, company, experience)
     });
   }
+  } catch (err) {
+    next(err);
+  }
 });
 
 function generateFallbackStrategy(tender, company, experience) {
@@ -894,8 +440,8 @@ app.post('/api/ai/compare', async (req, res) => {
       return res.status(400).json({ errors: { tender: 'Ikkita tender ID kerak' } });
     }
 
-    const t1 = TENDERS_DB.find(t => t.id === tender1Id);
-    const t2 = TENDERS_DB.find(t => t.id === tender2Id);
+    const t1 = await tenderRepository.findById(tender1Id);
+    const t2 = await tenderRepository.findById(tender2Id);
 
     if (!t1 || !t2) {
       return res.status(404).json({ error: 'Tender topilmadi' });
@@ -1084,7 +630,7 @@ app.get('/api/saved', authMiddleware, async (req, res) => {
   try {
     const user = await User.findOne({ id: req.user.id });
     const savedIds = user ? user.savedTenders : [];
-    const tenders = savedIds.map(id => TENDERS_DB.find(t => t.id === id)).filter(Boolean);
+    const tenders = await tenderRepository.findManyByIds(savedIds);
     res.json(tenders);
   } catch (err) {
     logger.error('Saved fetch error', err);
@@ -1114,7 +660,7 @@ app.get('/api/won', authMiddleware, async (req, res) => {
   try {
     const user = await User.findOne({ id: req.user.id });
     const wonIds = user ? user.wonTenders : [];
-    const tenders = wonIds.map(id => TENDERS_DB.find(t => t.id === id)).filter(Boolean);
+    const tenders = await tenderRepository.findManyByIds(wonIds);
     res.json(tenders);
   } catch (err) {
     logger.error('Won fetch error', err);
@@ -1145,8 +691,8 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     version: '2.0.0',
     timestamp: new Date().toISOString(),
-    ai: isGeminiConfigured() ? 'gemini-configured' : 'not_configured',
-    db: mongoose.connection.readyState === 1 ? 'ok' : 'missing'
+    ai: isGeminiConfigured() ? `${aiManager.providerName().toLowerCase()}-configured` : 'not_configured',
+    db: isDBConnected() ? 'ok' : 'missing'
   });
 });
 
@@ -1370,7 +916,7 @@ app.post('/api/chat', async (req, res) => {
   if (!message || typeof message !== 'string') return res.status(400).json({ error: 'Xabar talab qilinadi' });
   if (message.length > 8000) return res.status(400).json({ error: 'Xabar 8000 belgidan oshmasin' });
 
-  const tenderCount = TENDERS_DB.length;
+  const tenderCount = await tenderRepository.count();
   const systemPrompt = `Sen "TenderMind AI Maslahatchi"san — xatti-harakating ChatGPT yoki Claude kabi tabiiy, do'stona va suhbatga asoslangan bo'lsin, lekin ixtisoslashuving — O'zbekiston va umuman davlat xaridlari, tenderlar, kotirovkalar, shartnomalar va xarid jarayoni.
 
 ASOSIY PRINSIPLAR:
@@ -1392,7 +938,7 @@ KONTEKST (yordamchi):
 
   let contextInfo = '';
   if (tenderContext) {
-    const tender = TENDERS_DB.find(t => t.id === tenderContext);
+    const tender = await tenderRepository.findById(tenderContext);
     if (tender) {
       contextInfo = `\n\n[FOYDALANUVCHI TANLAGAN TENDER (demo bazadan)]
 ID: ${tender.id}
@@ -1413,7 +959,7 @@ Tavsif: ${tender.description || ''}`;
     return res.json({
       success: true,
       aiGenerated: false,
-      reply: generateFallbackChatReply(message, tenderContext)
+      reply: await generateFallbackChatReply(message, tenderContext)
     });
   }
 
@@ -1442,12 +988,12 @@ Tavsif: ${tender.description || ''}`;
     res.json({
       success: true,
       aiGenerated: false,
-      reply: generateFallbackChatReply(message, tenderContext)
+      reply: await generateFallbackChatReply(message, tenderContext)
     });
   }
 });
 
-function generateFallbackChatReply(message, tenderContext) {
+async function generateFallbackChatReply(message, tenderContext) {
   const msg = message.toLowerCase().trim();
 
   const beginnerHints =
@@ -1469,7 +1015,7 @@ function generateFallbackChatReply(message, tenderContext) {
   }
 
   if (tenderContext) {
-    const tender = TENDERS_DB.find(t => t.id === tenderContext);
+    const tender = await tenderRepository.findById(tenderContext);
     if (tender) {
       return `**"${tender.title}"** (tanlangan tender, demo ma'lumot)\n\n` +
         `**Kim e'lon qilgan:** ${tender.org}\n` +
@@ -1559,13 +1105,8 @@ app.use('/api/ai/recommend', aiLimiter);
 app.post('/api/ai/recommend', async (req, res) => {
   const { company, experience, soha, hudud } = req.body;
 
-  // Filter matching tenders
-  let candidates = [...TENDERS_DB];
-  if (soha && soha !== 'all') candidates = candidates.filter(t => t.soha === soha);
-  if (hudud && hudud !== 'all') candidates = candidates.filter(t => t.hudud === hudud);
-
-  // Sort by probability descending
-  candidates.sort((a, b) => b.probability - a.probability);
+  const candidatesResult = await tenderRepository.list({ soha, hudud, sort: 'probability', limit: 50 });
+  const candidates = candidatesResult.items;
   const top5 = candidates.slice(0, 5);
 
   if (!isGeminiConfigured()) {
@@ -1641,7 +1182,7 @@ JSON formatda qaytяr (faqat JSON):
 
     // Enrich with tender data
     parsed.recommendations = (parsed.recommendations || []).map(rec => {
-      const tender = TENDERS_DB.find(t => t.id === rec.tenderId);
+      const tender = candidates.find(t => t.id === rec.tenderId);
       if (tender) {
         rec.title = tender.title;
         rec.budget = tender.budget;
@@ -1721,13 +1262,36 @@ function validateStartupConfig() {
   }
 }
 
-app.listen(PORT, '127.0.0.1', () => {
+async function startServer() {
   validateStartupConfig();
-  logger.info(`TenderMind Server — http://localhost:${PORT}`);
-  logger.info(`AI: ${isGeminiConfigured() ? '✅ Gemini ulandi' : '❌ .env ga GEMINI_API_KEY kiriting'}`);
-  logger.info(`Mode: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`Tenderlar: ${TENDERS_DB.length} ta ma'lumot bazada`);
-});
+  const connection = await connectDB();
+  if (connection) {
+    try {
+      await tenderRepository.ensureSeeded();
+    } catch (err) {
+      logger.error('Tender seed error', err);
+    }
+  }
+
+  const server = app.listen(PORT, config.host, async () => {
+    logger.info(`TenderMind Server — http://localhost:${PORT}`);
+    logger.info(`AI: ${isGeminiConfigured() ? `✅ ${aiManager.providerName()} ulandi` : '❌ AI API key kiriting'}`);
+    logger.info(`Mode: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`MongoDB: ${isDBConnected() ? '✅ ulandi' : '❌ ulanmagan'}`);
+    if (isDBConnected()) logger.info(`Tenderlar: ${await tenderRepository.count()} ta ma'lumot bazada`);
+  });
+
+  return server;
+}
+
+if (require.main === module) {
+  startServer().catch(err => {
+    logger.error('Startup error', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { app, startServer };
 
 // Graceful shutdown — SIGTERM va SIGINT signallarini ushlash
 process.on('SIGTERM', () => {
