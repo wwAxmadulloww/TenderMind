@@ -2038,3 +2038,483 @@ textarea.ai-chat-input {
   #toast-container { left: 16px; right: 16px; max-width: unset; bottom: 16px; transform: none; }
   .ai-chat-window { max-height: 80vh; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   LOTLAR VA "ODDIY TILDA TUSHUNTIRISH"
+   Loyihaning yadro funksiyasi: har bir lot mohiyatini
+   tender bilan tanish bo'lmagan odamga tushuntirish.
+   ═══════════════════════════════════════════════════════════ */
+
+.badge-demo {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: rgba(255, 215, 0, 0.14);
+  color: var(--yellow);
+  border: 1px solid rgba(255, 215, 0, 0.35);
+}
+
+.stat-demo-mark { font-size: 10px; color: var(--yellow); opacity: 0.85; }
+
+.demo-notice {
+  margin: 16px 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(255, 215, 0, 0.07);
+  border: 1px solid rgba(255, 215, 0, 0.28);
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.demo-notice strong { color: var(--yellow); }
+
+/* ── Lot kartochkasi ─────────────────────────────────────── */
+.lots-container { display: flex; flex-direction: column; gap: 14px; }
+.lots-loading, .lots-empty { color: var(--text-2); font-size: 13px; padding: 10px 0; }
+
+.lot-card {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  transition: border-color 0.2s;
+}
+.lot-card:hover { border-color: var(--border-bright); }
+
+.lot-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.lot-number { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); }
+.lot-deadline { font-size: 11px; color: var(--text-2); }
+.lot-deadline.urgent { color: var(--yellow); }
+.lot-deadline.expired { color: var(--red); }
+
+.lot-title { font-size: 15px; font-weight: 600; margin: 0 0 10px; line-height: 1.45; }
+.lot-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12.5px; color: var(--text-2); margin-bottom: 14px; }
+.lot-meta strong { color: var(--text); font-weight: 600; }
+
+.lot-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-lot-explain, .btn-lot-fit {
+  padding: 8px 14px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-bright);
+  background: var(--bg-4);
+  color: var(--text);
+  transition: all 0.18s;
+}
+.btn-lot-explain:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.btn-lot-fit:hover { background: rgba(0, 229, 122, 0.1); border-color: var(--green); color: var(--green); }
+
+.lot-output:empty { display: none; }
+.lot-output { margin-top: 14px; }
+.lot-loading { color: var(--text-2); font-size: 13px; padding: 8px 0; }
+.lot-error { color: var(--red); font-size: 13px; padding: 8px 0; }
+
+/* ── Tushuntirish bloki ──────────────────────────────────── */
+.lot-explanation {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 16px;
+}
+.exp-summary { font-size: 14px; line-height: 1.7; margin-bottom: 14px; color: var(--text); }
+.exp-block { margin-bottom: 12px; }
+.exp-block:last-of-type { margin-bottom: 0; }
+.exp-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 5px;
+}
+.exp-block p { font-size: 13.5px; line-height: 1.65; color: var(--text-2); margin: 0; }
+.exp-block ul { margin: 0; padding-left: 18px; }
+.exp-block li { font-size: 13.5px; line-height: 1.7; color: var(--text-2); }
+.exp-source { margin-top: 12px; font-size: 11px; color: var(--text-3, var(--text-2)); opacity: 0.7; }
+
+/* ── "Menga mos keladimi?" natijasi ──────────────────────── */
+.lot-fit {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-bright);
+  border-radius: 8px;
+  padding: 16px;
+}
+.lot-fit.fit-ok { border-left-color: var(--green); }
+.lot-fit.fit-warn { border-left-color: var(--yellow); }
+.lot-fit.fit-bad { border-left-color: var(--red); }
+
+.fit-verdict { font-size: 14px; font-weight: 600; line-height: 1.6; margin-bottom: 12px; }
+.fit-group { margin-bottom: 12px; }
+.fit-group ul { margin: 0; padding-left: 18px; }
+.fit-group li { font-size: 13px; line-height: 1.75; color: var(--text-2); }
+.fit-note { font-size: 11.5px; color: var(--text-2); opacity: 0.75; margin: 10px 0 0; line-height: 1.55; }
+
+@media (max-width: 600px) {
+  .lot-meta { flex-direction: column; gap: 6px; }
+  .lot-actions { flex-direction: column; }
+  .btn-lot-explain, .btn-lot-fit { width: 100%; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TA'LIM QATLAMI — lug'at va boshlang'ich yo'riqnoma
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Atama belgisi va popup ──────────────────────────────── */
+.gloss-term {
+  border-bottom: 1px dashed var(--accent);
+  cursor: help;
+  color: inherit;
+}
+.gloss-term:hover { background: var(--accent-dim); border-radius: 3px; }
+
+.exp-hint { margin-top: 14px; font-size: 11.5px; color: var(--text-2); opacity: 0.8; }
+
+.gloss-popup {
+  position: absolute;
+  /* Modal oynalar z-index: 9000 — atama izohi ular ustida chiqishi kerak,
+     chunki u ko'pincha aynan modal ichidagi matndan ochiladi. */
+  z-index: 10000;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  background: var(--bg-4);
+  border: 1px solid var(--border-bright);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+.gloss-popup-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.gloss-popup-head strong { font-size: 14px; color: var(--accent); }
+.gloss-popup-head button {
+  background: none; border: none; color: var(--text-2);
+  cursor: pointer; font-size: 14px; padding: 0 2px;
+}
+.gloss-popup-head button:hover { color: var(--text); }
+.gloss-short { font-size: 13px; line-height: 1.65; margin: 0 0 10px; color: var(--text); }
+.gloss-example {
+  font-size: 12.5px; line-height: 1.6; margin: 0;
+  color: var(--text-2); padding-top: 10px; border-top: 1px solid var(--border);
+}
+.gloss-example span { color: var(--accent); font-weight: 600; }
+
+/* ── Yo'riqnoma tugmasi ──────────────────────────────────── */
+.btn-guide-open {
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-mid);
+  color: var(--accent);
+  white-space: nowrap;
+  transition: all 0.18s;
+}
+.btn-guide-open:hover { background: var(--accent-mid); }
+
+/* ── Yo'riqnoma modali ───────────────────────────────────── */
+.guide-box { max-width: 640px; }
+
+.guide-progress { display: flex; align-items: center; gap: 7px; margin-bottom: 20px; }
+.guide-dot {
+  width: 26px; height: 4px; border-radius: 2px;
+  background: var(--border-bright); cursor: pointer; transition: background 0.2s;
+}
+.guide-dot.done { background: var(--green); }
+.guide-dot.active { background: var(--accent); }
+.guide-counter { margin-left: auto; font-size: 11.5px; color: var(--text-2); }
+
+.guide-title { font-size: 19px; font-weight: 700; margin: 0 0 14px; line-height: 1.4; }
+.guide-text p { font-size: 14px; line-height: 1.75; color: var(--text-2); margin: 0 0 12px; }
+
+.guide-key {
+  background: var(--accent-dim);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  margin: 18px 0;
+}
+.guide-key-label {
+  display: block; font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 5px;
+}
+.guide-key p { margin: 0; font-size: 14px; line-height: 1.65; color: var(--text); font-weight: 500; }
+
+.guide-action {
+  display: block; width: 100%;
+  padding: 12px; margin-bottom: 18px;
+  border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  background: var(--bg-4); border: 1px solid var(--border-bright); color: var(--text);
+  transition: all 0.18s;
+}
+.guide-action:hover { border-color: var(--accent); color: var(--accent); }
+
+.guide-nav { display: flex; gap: 10px; align-items: center; }
+.guide-btn {
+  padding: 11px 18px; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.18s;
+}
+.guide-btn.ghost { background: transparent; border: 1px solid var(--border-bright); color: var(--text-2); }
+.guide-btn.ghost:hover:not(:disabled) { color: var(--text); border-color: var(--text-2); }
+.guide-btn.ghost:disabled { opacity: 0.35; cursor: not-allowed; }
+.guide-btn.primary {
+  margin-left: auto;
+  background: var(--accent); border: 1px solid var(--accent); color: #0d0d14;
+}
+.guide-btn.primary:hover { filter: brightness(1.1); }
+
+@media (max-width: 600px) {
+  .btn-guide-open { font-size: 11px; padding: 7px 10px; }
+  .guide-nav { flex-wrap: wrap; }
+  .guide-btn.primary { margin-left: 0; width: 100%; order: -1; margin-bottom: 8px; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ADMIN PANEL (/admin)
+   ═══════════════════════════════════════════════════════════ */
+
+.admin-body { background: var(--bg); color: var(--text); min-height: 100vh; }
+.admin-shell { min-height: 100vh; }
+
+/* ── Kirish ekrani ───────────────────────────────────────── */
+.admin-login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.admin-login-box {
+  width: 100%; max-width: 380px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 14px; padding: 32px;
+}
+.admin-login-box h1 { font-size: 22px; margin: 0 0 6px; }
+.admin-login-sub { font-size: 13px; color: var(--text-2); margin: 0 0 24px; }
+.admin-error { color: var(--red); font-size: 13px; min-height: 18px; margin-bottom: 10px; }
+.admin-back-link { display: block; text-align: center; margin-top: 18px; font-size: 12.5px; color: var(--text-2); text-decoration: none; }
+.admin-back-link:hover { color: var(--accent); }
+
+/* ── Sarlavha va navigatsiya ─────────────────────────────── */
+.admin-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 24px; background: var(--bg-2); border-bottom: 1px solid var(--border);
+  flex-wrap: wrap; gap: 12px;
+}
+.admin-brand { display: flex; align-items: center; gap: 9px; font-size: 15px; }
+.admin-brand .logo-icon { color: var(--accent); }
+.admin-tag {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.09em;
+  padding: 3px 7px; border-radius: 4px;
+  background: var(--red); color: #fff;
+}
+.admin-header-right { display: flex; align-items: center; gap: 10px; }
+.admin-who { font-size: 12.5px; color: var(--text-2); }
+
+.admin-nav {
+  display: flex; gap: 4px; padding: 0 24px;
+  background: var(--bg-2); border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.admin-tab {
+  padding: 13px 18px; background: none; border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-2); font-size: 13.5px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; transition: all 0.18s;
+}
+.admin-tab:hover { color: var(--text); }
+.admin-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.admin-badge {
+  display: inline-block; margin-left: 5px; padding: 1px 6px;
+  border-radius: 9px; font-size: 10.5px; font-weight: 700;
+  background: var(--red); color: #fff;
+}
+
+.admin-main { padding: 26px 24px 60px; max-width: 1280px; }
+.admin-h2 { font-size: 18px; font-weight: 700; margin: 0 0 18px; }
+.admin-count { font-size: 13px; color: var(--text-2); font-weight: 500; margin-left: 6px; }
+.admin-view-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.admin-loading { color: var(--text-2); font-size: 13.5px; padding: 30px 0; }
+
+/* ── Statistika ──────────────────────────────────────────── */
+.admin-stats-grid {
+  display: grid; gap: 14px; margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+.admin-stat { background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+.admin-stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); margin-bottom: 7px; }
+.admin-stat-value { font-size: 27px; font-weight: 700; color: var(--accent); line-height: 1.1; }
+.admin-stat-hint { font-size: 11.5px; color: var(--text-2); margin-top: 6px; }
+
+.admin-notice {
+  background: rgba(200, 255, 0, 0.06); border: 1px solid var(--accent-mid);
+  border-radius: 9px; padding: 14px 16px; font-size: 13px; line-height: 1.65;
+  color: var(--text-2); margin-bottom: 20px;
+}
+.admin-notice strong { color: var(--accent); }
+.admin-notice.warn { background: rgba(255, 215, 0, 0.07); border-color: rgba(255, 215, 0, 0.35); }
+.admin-notice.warn strong { color: var(--yellow); }
+.admin-error-box { color: var(--red); background: rgba(255,77,106,0.08); border: 1px solid rgba(255,77,106,0.3); border-radius: 8px; padding: 14px; font-size: 13.5px; }
+
+/* ── Jadval ──────────────────────────────────────────────── */
+.admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.admin-table th {
+  text-align: left; padding: 11px 12px;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-2); border-bottom: 1px solid var(--border); font-weight: 700;
+}
+.admin-table td { padding: 13px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.admin-table tr:hover td { background: var(--bg-2); }
+.admin-cell-title { font-weight: 600; margin-bottom: 3px; max-width: 380px; }
+.admin-cell-sub { font-size: 11.5px; color: var(--text-2); }
+.admin-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.admin-actions-cell { white-space: nowrap; }
+
+.admin-pill {
+  display: inline-block; padding: 3px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+}
+.admin-pill.demo { background: rgba(255,215,0,0.14); color: var(--yellow); }
+.admin-pill.real { background: rgba(0,229,122,0.12); color: var(--green); }
+.admin-pill.admin-role { background: var(--red); color: #fff; }
+.admin-pill.plan-free { background: var(--bg-4); color: var(--text-2); }
+.admin-pill.plan-pro { background: var(--accent-dim); color: var(--accent); }
+.admin-pill.plan-corporate { background: rgba(0,229,122,0.12); color: var(--green); }
+.admin-pill.status-pending { background: rgba(255,215,0,0.14); color: var(--yellow); }
+.admin-pill.status-active { background: rgba(0,229,122,0.12); color: var(--green); }
+.admin-pill.status-canceled, .admin-pill.status-expired { background: var(--bg-4); color: var(--text-2); }
+
+.admin-pagination { display: flex; gap: 5px; margin-top: 18px; flex-wrap: wrap; }
+.admin-page {
+  min-width: 32px; padding: 6px 9px; border-radius: 6px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--text-2); font-size: 12.5px; cursor: pointer;
+}
+.admin-page.active { background: var(--accent); border-color: var(--accent); color: #0d0d14; font-weight: 700; }
+
+/* ── Formalar ────────────────────────────────────────────── */
+.admin-form {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 11px; padding: 22px; margin: 16px 0 22px;
+}
+.admin-form h3 { font-size: 15px; margin: 0 0 16px; }
+.admin-form-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.admin-form-wide { grid-column: 1 / -1; }
+.admin-form label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-2); }
+.admin-form input, .admin-form select, .admin-form textarea {
+  padding: 9px 11px; border-radius: 7px;
+  background: var(--bg-3); border: 1px solid var(--border);
+  color: var(--text); font-size: 13px; font-family: inherit;
+}
+.admin-form input:focus, .admin-form select:focus, .admin-form textarea:focus {
+  outline: none; border-color: var(--accent);
+}
+.admin-form-actions { display: flex; gap: 9px; justify-content: flex-end; margin-top: 18px; }
+
+.admin-mini-select {
+  padding: 5px 8px; border-radius: 6px; font-size: 12px;
+  background: var(--bg-3); border: 1px solid var(--border); color: var(--text);
+}
+
+/* ── Tugmalar ────────────────────────────────────────────── */
+.admin-btn {
+  padding: 9px 16px; border-radius: 7px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1px solid transparent; transition: all 0.18s;
+  text-decoration: none; display: inline-block;
+}
+.admin-btn.small { padding: 6px 11px; font-size: 12px; }
+.admin-btn.full { width: 100%; }
+.admin-btn.primary { background: var(--accent); color: #0d0d14; }
+.admin-btn.primary:hover { filter: brightness(1.1); }
+.admin-btn.ghost { background: transparent; border-color: var(--border-bright); color: var(--text-2); }
+.admin-btn.ghost:hover { color: var(--text); border-color: var(--text-2); }
+.admin-btn.danger { background: transparent; border-color: rgba(255,77,106,0.4); color: var(--red); }
+.admin-btn.danger:hover { background: rgba(255,77,106,0.1); }
+
+/* ── Toast ───────────────────────────────────────────────── */
+.admin-toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  padding: 13px 18px; border-radius: 9px; font-size: 13px; font-weight: 500;
+  background: var(--bg-4); border: 1px solid var(--border-bright); color: var(--text);
+  opacity: 0; transform: translateY(10px); pointer-events: none;
+  transition: opacity 0.22s, transform 0.22s;
+  max-width: 340px;
+}
+.admin-toast.show { opacity: 1; transform: translateY(0); }
+.admin-toast.success { border-color: var(--green); }
+.admin-toast.error { border-color: var(--red); }
+
+@media (max-width: 720px) {
+  .admin-main { padding: 18px 14px 50px; }
+  .admin-table { font-size: 12px; }
+  .admin-table th:nth-child(3), .admin-table td:nth-child(3) { display: none; }
+}
+
+/* ── Tariflar (serverdan render qilinadi) ────────────────── */
+.pricing-loading { color: var(--text-2); font-size: 13.5px; padding: 30px 0; grid-column: 1 / -1; text-align: center; }
+.pricing-desc { font-size: 12.5px; color: var(--text-2); margin: 0 0 16px; line-height: 1.55; }
+
+/* ── Hisob-faktura ───────────────────────────────────────── */
+.invoice-box { max-width: 480px; }
+.invoice-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 14px;
+  padding: 11px 0; border-bottom: 1px solid var(--border); font-size: 13.5px;
+}
+.invoice-row span { color: var(--text-2); }
+.invoice-number { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); }
+.invoice-status { color: var(--yellow); }
+.invoice-warn {
+  background: rgba(255,215,0,0.08); border: 1px solid rgba(255,215,0,0.3);
+  border-radius: 8px; padding: 11px 13px; font-size: 12.5px; color: var(--yellow); margin-bottom: 14px;
+}
+.invoice-steps { margin: 18px 0 0; padding-left: 20px; }
+.invoice-steps li { font-size: 13px; line-height: 1.7; color: var(--text-2); margin-bottom: 7px; }
+.invoice-note {
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-2); line-height: 1.6; opacity: 0.85;
+}
+
+/* ── Kabinet: tarif va Telegram bloklari ─────────────────── */
+.cab-block-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cab-block-head h4 { font-size: 14px; font-weight: 600; margin: 0; }
+.cab-status { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 4px; }
+.cab-status.ok { background: rgba(0,229,122,0.12); color: var(--green); }
+.cab-status.off { background: var(--bg-4); color: var(--text-2); }
+
+.cab-block-text { font-size: 12.5px; line-height: 1.65; color: var(--text-2); margin: 0 0 12px; }
+.cab-block-hint { font-size: 11.5px; color: var(--text-2); margin: 10px 0 0; opacity: 0.85; }
+.cab-block-text code, .cab-block-hint code {
+  background: var(--bg-4); padding: 2px 6px; border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px;
+}
+
+.tg-code-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tg-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 17px; font-weight: 700; letter-spacing: 0.12em; color: var(--accent);
+  background: var(--bg-4); padding: 8px 14px; border-radius: 7px;
+  border: 1px dashed var(--accent-mid);
+}
+
+.cab-usage { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.cab-usage div { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-2); }
+.cab-usage strong { color: var(--text); font-weight: 600; }
+
+.cab-pending {
+  background: rgba(255,215,0,0.07); border: 1px solid rgba(255,215,0,0.28);
+  border-radius: 7px; padding: 10px 12px; font-size: 12px; color: var(--text-2);
+  line-height: 1.6; margin-bottom: 12px;
+}
+
+.btn-cab-primary, .btn-cab-secondary {
+  display: inline-block; padding: 9px 16px; border-radius: 7px;
+  font-size: 12.5px; font-weight: 600; cursor: pointer; text-decoration: none;
+  border: 1px solid transparent; transition: all 0.18s;
+}
+.btn-cab-primary { background: var(--accent); color: #0d0d14; }
+.btn-cab-primary:hover { filter: brightness(1.1); }
+.btn-cab-secondary { background: transparent; border-color: var(--border-bright); color: var(--text-2); }
+.btn-cab-secondary:hover { color: var(--text); border-color: var(--text-2); }

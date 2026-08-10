@@ -6,8 +6,8 @@
 
 // ── Validation Rules ─────────────────────────────────────────────────
 const validators = {
-  // Phone validation (Uzbek +998 format)
-  phone: (val) => /^\+998\d{9,12}$/.test(val),
+  // Telefon: O'zbekiston formati — +998 va aynan 9 ta raqam
+  phone: (val) => /^\+998\d{9}$/.test(val),
   
   // Email validation
   email: (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
@@ -140,14 +140,17 @@ function sanitizeBody(schema) {
   };
 }
 
-// ── Uzbekistan phone: +998 + 9–12 raqam ───────────────────────────────
+// ── O'zbekiston telefoni: +998 + 9 ta raqam ───────────────────────────
+// Operator kodlari faqat 9 bilan boshlanmaydi: 88, 77, 33, 20, 71 va h.k.
+// ham amalda. Shuning uchun 9 xonali istalgan raqam qabul qilinadi.
 function normalizeUzbekPhone(input) {
   if (input == null || typeof input !== 'string') return '';
   const compact = input.replace(/\s/g, '');
-  if (/^\+998\d{9,12}$/.test(compact)) return compact;
+  if (/^\+998\d{9}$/.test(compact)) return compact;
+
   const digits = input.replace(/\D/g, '');
   if (digits.length === 12 && digits.startsWith('998')) return `+${digits}`;
-  if (digits.length === 9 && digits.startsWith('9')) return `+998${digits}`;
+  if (digits.length === 9) return `+998${digits}`;
   return compact.trim();
 }
 

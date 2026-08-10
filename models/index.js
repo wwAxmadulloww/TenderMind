@@ -1,5 +1,5 @@
 'use strict';
 
-const { User, Tender, Subscription, mongoose } = require('../db');
+const { User, Tender, Lot, Subscription, mongoose } = require('../db');
 
-module.exports = { User, Tender, Subscription, mongoose };
+module.exports = { User, Tender, Lot, Subscription, mongoose };

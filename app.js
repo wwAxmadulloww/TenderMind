@@ -7,7 +7,7 @@
 
 // Frontend endi host etilgan domenga avtomatik moslashadi (Render yoki Localhost)
 const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-  ? 'http://localhost:3001' 
+  ? window.location.origin 
   : '';
 
 // ── State ──────────────────────────────────────────────────────────
@@ -25,6 +25,50 @@ const state = {
   strategyTender: null,
 };
 
+// ── API helper ────────────────────────────────────────────────────
+// Barcha himoyalangan endpointlar uchun yagona nuqta: token qo'shadi,
+// 401 (token yo'q/eskirgan) va 429 (limit tugadi) holatlarini bir joyda
+// tushunarli xabar bilan boshqaradi.
+class ApiError extends Error {
+  constructor(message, status, data) {
+    super(message);
+    this.status = status;
+    this.data = data || {};
+  }
+}
+
+async function apiFetch(path, options = {}) {
+  const { auth = true, ...rest } = options;
+
+  if (auth && !state.token) {
+    showModal('auth-modal');
+    throw new ApiError('Bu funksiya uchun tizimga kiring', 401, {});
+  }
+
+  const headers = { 'Content-Type': 'application/json', ...(rest.headers || {}) };
+  if (auth && state.token) headers.Authorization = `Bearer ${state.token}`;
+
+  const r = await fetch(`${API}${path}`, { ...rest, headers });
+
+  if (r.status === 401 && auth) {
+    doLogout();
+    showModal('auth-modal');
+    throw new ApiError('Sessiya tugadi. Qaytadan kiring.', 401, {});
+  }
+
+  return r;
+}
+
+// JSON kutilgan so'rovlar uchun qisqartma
+async function apiJson(path, options = {}) {
+  const r = await apiFetch(path, options);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new ApiError(data.message || data.error || 'Server xatosi', r.status, data);
+  }
+  return data;
+}
+
 // ── INIT ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initAuth();
@@ -33,6 +77,8 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchTenders();
   renderSavedTab();
   initAIChatInput();
+  loadGlossary();
+  loadPlans();
 });
 
 function initAIChatInput() {
@@ -428,13 +474,19 @@ function renderTenderCard(t) {
   const deadlineColor = daysLeft < 10 ? '#ff4d6a' : daysLeft < 20 ? '#ffd700' : 'var(--text-3)';
   const isNew = t.isNew ? '<span class="badge-new">Yangi</span>' : '';
   const isUrgent = t.status === 'urgent' ? '<span class="badge-urgent">Shoshilinch</span>' : '';
+  const isDemo = t.isDemo ? '<span class="badge-demo">DEMO</span>' : '';
+
+  // probability/competitors haqiqiy e'lonlarda bo'lmaydi — bunday holatda
+  // ular umuman ko'rsatilmaydi. Soxta raqam chizishdan ko'ra bo'sh joy yaxshi.
+  const hasProbability = Number.isFinite(t.probability);
+  const hasCompetitors = Number.isFinite(t.competitors);
 
   return `
   <div class="tender-card" id="tc-${t.id}" onclick="openTenderDetail('${t.id}')">
     <div class="tender-card-header">
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <span class="tender-soha-badge badge-${t.soha}">${sohaLabel(t.soha)}</span>
-        ${isNew}${isUrgent}
+        ${isNew}${isUrgent}${isDemo}
       </div>
       <span class="tender-deadline" style="color:${deadlineColor}">⏰ ${daysLeft} kun</span>
     </div>
@@ -445,17 +497,18 @@ function renderTenderCard(t) {
         <div class="tender-meta-value budget">${t.budget} so'm</div>
       </div>
       <div class="tender-meta-item">
-        <div class="tender-meta-label">Raqiblar</div>
-        <div class="tender-meta-value">${t.competitors} ta</div>
+        <div class="tender-meta-label">${hasCompetitors ? 'Raqiblar' : 'Lotlar'}</div>
+        <div class="tender-meta-value">${hasCompetitors ? `${t.competitors} ta` : `${t.lotCount || 1} ta`}</div>
       </div>
     </div>
+    ${hasProbability ? `
     <div class="tender-probability">
       <div class="probability-header">
-        <span class="probability-label">G'alaba ehtimoli</span>
+        <span class="probability-label">G'alaba ehtimoli${t.estimatesAreDemo ? ' (demo)' : ''}</span>
         <span class="probability-value ${probColor}">${t.probability}%</span>
       </div>
       <div class="prob-bar"><div class="prob-fill ${fillColor}" style="width:${t.probability}%"></div></div>
-    </div>
+    </div>` : ''}
     <div class="tender-card-footer">
       <div class="tender-tags">${t.tags.map(tag => `<span class="tender-tag">${tag}</span>`).join('')}</div>
       <button class="btn-won-tender" data-id="${t.id}" onclick="toggleWon('${t.id}',event)" title="Yutganlarga qo'shish" style="margin-left:5px">🏅</button>
@@ -512,6 +565,7 @@ function renderTenderModal(t) {
         <span class="tender-soha-badge badge-${t.soha}">${sohaLabel(t.soha)}</span>
         ${t.isNew ? '<span class="badge-new">Yangi</span>' : ''}
         ${t.status === 'urgent' ? '<span class="badge-urgent">Shoshilinch</span>' : ''}
+        ${t.isDemo ? '<span class="badge-demo" title="Namunaviy ma\'lumot — o\'rganish uchun. Haqiqiy e\'lon emas.">DEMO</span>' : ''}
       </div>
       <div class="modal-header-actions">
         <button class="modal-save-btn ${isSaved?'saved':''}" onclick="toggleSave('${t.id}',event)" data-id="${t.id}">
@@ -529,17 +583,39 @@ function renderTenderModal(t) {
           <div class="modal-stat-label">Byudjet</div>
           <div class="modal-stat-value accent">${t.budget} so'm</div>
         </div>
+        ${Number.isFinite(t.probability) ? `
         <div class="modal-stat">
-          <div class="modal-stat-label">G'alaba ehtimoli</div>
+          <div class="modal-stat-label">G'alaba ehtimoli${t.estimatesAreDemo ? ' <span class="stat-demo-mark" title="Bu raqam hisoblangan emas — namunaviy qiymat">(demo)</span>' : ''}</div>
           <div class="modal-stat-value" style="color:${probColor}">${t.probability}%</div>
-        </div>
+        </div>` : ''}
+        ${Number.isFinite(t.competitors) ? `
         <div class="modal-stat">
-          <div class="modal-stat-label">Raqiblar</div>
+          <div class="modal-stat-label">Raqiblar${t.estimatesAreDemo ? ' <span class="stat-demo-mark" title="Bu raqam hisoblangan emas — namunaviy qiymat">(demo)</span>' : ''}</div>
           <div class="modal-stat-value">${t.competitors} ta</div>
-        </div>
+        </div>` : ''}
         <div class="modal-stat">
           <div class="modal-stat-label">Muddat</div>
           <div class="modal-stat-value" style="color:${deadlineColor}">${daysLeft} kun qoldi</div>
+        </div>
+      </div>
+
+      ${t.isDemo ? `
+      <div class="demo-notice">
+        <strong>Namunaviy ma'lumot.</strong> Bu yozuv o'rganish uchun tayyorlangan —
+        haqiqiy e'lon emas. Haqiqiy tenderlar uchun rasmiy portalni tekshiring.
+      </div>` : (t.isVerified === false ? `
+      <div class="demo-notice unverified">
+        <strong>Tekshirilmagan.</strong> Bu yozuv tashqi manbadan avtomatik olingan
+        va hali qo'lda tasdiqlanmagan. Taklif berishdan oldin
+        ${t.sourceUrl ? `<a href="${t.sourceUrl}" target="_blank" rel="noopener noreferrer">asl e'lonni</a>` : 'asl e\'lonni'}
+        tekshiring.
+      </div>` : '')}
+
+      <!-- LOTLAR — foydalanuvchi aynan lotga taklif beradi, tenderga emas -->
+      <div class="modal-section" id="lots-section">
+        <h4>Lotlar</h4>
+        <div id="lots-container" class="lots-container">
+          <div class="lots-loading">Lotlar yuklanmoqda...</div>
         </div>
       </div>
 
@@ -575,6 +651,473 @@ function renderTenderModal(t) {
         🤖 AI dan maslahat
       </button>
     </div>`;
+
+  loadLotsForTender(t.id);
+}
+
+// ══════════════════════════════════════════════
+// TARIFLAR VA OBUNA
+// ══════════════════════════════════════════════
+const billingState = { plans: [], methods: [], loaded: false };
+
+async function loadPlans() {
+  const grid = document.getElementById('pricing-grid');
+  if (!grid) return;
+
+  try {
+    const r = await apiFetch('/api/billing/plans', { auth: false });
+    const data = await r.json();
+    billingState.plans = data.plans || [];
+    billingState.methods = data.paymentMethods || [];
+    billingState.loaded = true;
+
+    grid.innerHTML = billingState.plans.map(renderPlanCard).join('');
+
+    const note = document.getElementById('pricing-note');
+    if (note) {
+      const automatic = billingState.methods.filter(m => m.automatic);
+      note.innerHTML = automatic.length
+        ? '<strong>Eslatma:</strong> to\'lov onlayn amalga oshiriladi.'
+        : '<strong>Eslatma:</strong> hozircha to\'lov bank o\'tkazmasi orqali qabul qilinadi. '
+          + 'Obuna bo\'lganingizda hisob-faktura beriladi; to\'lov tasdiqlangach tarif faollashadi.';
+    }
+  } catch {
+    grid.innerHTML = '<div class="pricing-loading">Tariflarni yuklab bo\'lmadi.</div>';
+  }
+}
+
+function renderPlanCard(plan) {
+  const isFree = plan.priceMonthly === 0;
+  const isFeatured = plan.id === 'pro';
+
+  return `
+  <div class="pricing-card ${isFeatured ? 'featured-pricing' : ''}">
+    ${isFeatured ? '<div class="pricing-popular-badge">ENG MASHHUR</div>' : ''}
+    <h3 class="pricing-tier">${escapeChatHtml(plan.name.toUpperCase())}</h3>
+    <div class="pricing-price">
+      <span style="font-size:32px;font-weight:700;color:var(--text)">
+        ${new Intl.NumberFormat('uz-UZ').format(plan.priceMonthly)}
+      </span>
+      <span style="color:var(--text-3)">so'm/oy</span>
+    </div>
+    <p class="pricing-desc">${escapeChatHtml(plan.description)}</p>
+    <ul class="pricing-features">
+      ${plan.features.map(f => `<li><span style="color:var(--accent)">✓</span> ${escapeChatHtml(f)}</li>`).join('')}
+    </ul>
+    <button class="btn-pricing ${isFeatured ? 'featured-btn' : ''}"
+            onclick="${isFree ? "showPage('app-page')" : `startSubscribe('${plan.id}')`}">
+      ${isFree ? 'Bepul boshlash' : 'Obuna bo\'lish'}
+    </button>
+  </div>`;
+}
+
+async function startSubscribe(planId) {
+  if (!state.token) {
+    showModal('auth-modal');
+    showToast('Obuna uchun avval tizimga kiring', 'info');
+    return;
+  }
+
+  const plan = billingState.plans.find(p => p.id === planId);
+  if (!plan) return;
+
+  const months = Number(prompt(
+    `${plan.name} tarifi — necha oyga obuna bo'lasiz?\n\n`
+    + `1 oy = ${new Intl.NumberFormat('uz-UZ').format(plan.priceMonthly)} so'm\n`
+    + '12 oyga olsangiz 2 oy bepul.',
+    '1'
+  ));
+  if (!months || months < 1) return;
+
+  try {
+    const data = await apiJson('/api/billing/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({ plan: planId, months, paymentMethod: 'transfer' }),
+    });
+    showInvoice(data);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function showInvoice(data) {
+  const invoice = data.invoice;
+  const modal = document.getElementById('invoice-modal');
+  if (!modal) return;
+
+  document.getElementById('invoice-body').innerHTML = `
+    ${data.alreadyPending ? `
+      <div class="invoice-warn">Sizda tasdiqlanmagan hisob-faktura bor. Yangisi yaratilmadi.</div>` : ''}
+
+    <div class="invoice-row"><span>Tarif</span><strong>${escapeChatHtml(invoice.planName || invoice.plan)}</strong></div>
+    <div class="invoice-row"><span>Summa</span><strong>${new Intl.NumberFormat('uz-UZ').format(invoice.amount)} ${escapeChatHtml(invoice.currency)}</strong></div>
+    <div class="invoice-row"><span>Hisob-faktura</span><strong class="invoice-number">${escapeChatHtml(invoice.invoiceNumber)}</strong></div>
+    <div class="invoice-row"><span>Holat</span><strong class="invoice-status">To'lov kutilmoqda</strong></div>
+
+    <ol class="invoice-steps">
+      ${(data.instructions || []).map(step => `<li>${escapeChatHtml(step)}</li>`).join('')}
+    </ol>
+
+    <p class="invoice-note">
+      Tarif to'lov tasdiqlangandan keyin faollashadi. Hozircha bepul
+      tarifdagi imkoniyatlardan foydalanishingiz mumkin.
+    </p>`;
+
+  showModal('invoice-modal');
+}
+
+// ══════════════════════════════════════════════
+// "BIRINCHI TENDERINGIZ" — boshlang'ich yo'riqnoma
+// ══════════════════════════════════════════════
+const guide = { steps: [], current: 0, progress: null, loaded: false };
+
+async function openGuide(startAt = 0) {
+  if (!guide.loaded) {
+    try {
+      const r = await apiFetch('/api/onboarding', { auth: false });
+      const data = await r.json();
+      guide.steps = data.steps || [];
+      guide.progress = data.progress || null;
+      guide.loaded = true;
+    } catch {
+      showToast('Yo\'riqnomani yuklab bo\'lmadi', 'error');
+      return;
+    }
+  }
+
+  // Tugallanmagan birinchi qadamdan davom etamiz
+  if (startAt === 0 && guide.progress?.completedSteps?.length) {
+    const firstUndone = guide.steps.findIndex(s => !guide.progress.completedSteps.includes(s.id));
+    startAt = firstUndone === -1 ? 0 : firstUndone;
+  }
+
+  guide.current = Math.max(0, Math.min(startAt, guide.steps.length - 1));
+  renderGuide();
+  showModal('guide-modal');
+}
+
+function renderGuide() {
+  const step = guide.steps[guide.current];
+  if (!step) return;
+
+  const body = document.getElementById('guide-body');
+  if (!body) return;
+
+  const done = guide.progress?.completedSteps || [];
+  const isLast = guide.current === guide.steps.length - 1;
+
+  body.innerHTML = `
+    <div class="guide-progress">
+      ${guide.steps.map((s, i) => `
+        <span class="guide-dot ${i === guide.current ? 'active' : ''} ${done.includes(s.id) ? 'done' : ''}"
+              onclick="guide.current=${i};renderGuide()" title="${escapeChatHtml(s.title)}"></span>
+      `).join('')}
+      <span class="guide-counter">${guide.current + 1} / ${guide.steps.length}</span>
+    </div>
+
+    <h3 class="guide-title">${escapeChatHtml(step.title)}</h3>
+
+    <div class="guide-text">
+      ${step.body.map(p => `<p>${linkifyTerms(escapeChatHtml(p))}</p>`).join('')}
+    </div>
+
+    <div class="guide-key">
+      <span class="guide-key-label">Eng muhimi</span>
+      <p>${linkifyTerms(escapeChatHtml(step.keyPoint))}</p>
+    </div>
+
+    ${step.action ? `
+      <button class="guide-action" onclick="guideAction('${step.action.target}')">
+        ${escapeChatHtml(step.action.label)} →
+      </button>` : ''}
+
+    <div class="guide-nav">
+      <button class="guide-btn ghost" onclick="guidePrev()" ${guide.current === 0 ? 'disabled' : ''}>
+        ← Orqaga
+      </button>
+      <button class="guide-btn ghost" onclick="skipGuide()">O'tkazib yuborish</button>
+      <button class="guide-btn primary" onclick="guideNext()">
+        ${isLast ? '✓ Tugatdim' : 'Keyingisi →'}
+      </button>
+    </div>`;
+}
+
+function guidePrev() {
+  if (guide.current > 0) { guide.current -= 1; renderGuide(); }
+}
+
+async function guideNext() {
+  const step = guide.steps[guide.current];
+  if (step) await saveGuideProgress({ stepId: step.id });
+
+  if (guide.current < guide.steps.length - 1) {
+    guide.current += 1;
+    renderGuide();
+  } else {
+    hideModal('guide-modal');
+    showToast('Yo\'riqnoma tugadi. Endi birinchi lotingizni tanlang!', 'success');
+    switchTab('tenderlar');
+  }
+}
+
+async function skipGuide() {
+  await saveGuideProgress({ skip: true });
+  hideModal('guide-modal');
+}
+
+async function saveGuideProgress(payload) {
+  // Progress faqat tizimga kirganlar uchun saqlanadi — yo'riqnomaning
+  // o'zi esa hammaga ochiq. Xato bo'lsa jimgina o'tkazib yuboriladi.
+  if (!state.token) return;
+  try {
+    const data = await apiJson('/api/onboarding/progress', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    guide.progress = data.progress;
+  } catch {
+    // saqlanmasa ham yo'riqnoma ishlashda davom etadi
+  }
+}
+
+function guideAction(target) {
+  hideModal('guide-modal');
+  showPage('app-page');
+  switchTab(target);
+}
+
+// ══════════════════════════════════════════════
+// ATAMALAR LUG'ATI — notanish so'z ustiga bosilsa izoh chiqadi
+// ══════════════════════════════════════════════
+const glossary = { terms: [], byAlias: new Map(), loaded: false, pattern: null };
+
+async function loadGlossary() {
+  if (glossary.loaded) return;
+  try {
+    const r = await apiFetch('/api/glossary', { auth: false });
+    const data = await r.json();
+    glossary.terms = data.terms || [];
+
+    const aliases = [];
+    for (const entry of glossary.terms) {
+      for (const alias of entry.aliases) {
+        glossary.byAlias.set(alias.toLowerCase(), entry);
+        aliases.push(alias);
+      }
+    }
+
+    // Uzunroq shakllar avval tekshirilsin ("narx taklifi" > "narx")
+    aliases.sort((a, b) => b.length - a.length);
+    const escaped = aliases.map(a => a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    // \b lotin harflari uchun ishlaydi; apostrofli shakllar ham qamrab olinadi
+    glossary.pattern = new RegExp(`\\b(${escaped.join('|')})\\b`, 'gi');
+    glossary.loaded = true;
+  } catch {
+    glossary.loaded = true;   // qayta-qayta urinmaslik uchun
+  }
+}
+
+/**
+ * Matndagi tanish atamalarni bosiladigan qilib belgilaydi.
+ * DIQQAT: kirish matni allaqachon HTML-escape qilingan bo'lishi shart.
+ */
+function linkifyTerms(escapedHtml) {
+  if (!glossary.pattern || !escapedHtml) return escapedHtml;
+  let count = 0;
+  return escapedHtml.replace(glossary.pattern, (match) => {
+    const entry = glossary.byAlias.get(match.toLowerCase());
+    // Bir matnda bir atama ko'p marta belgilanmasin — o'qishga xalaqit beradi
+    if (!entry || count >= 6) return match;
+    count += 1;
+    return `<span class="gloss-term" onclick="showTermPopup('${encodeURIComponent(entry.term)}', event)">${match}</span>`;
+  });
+}
+
+function showTermPopup(encodedTerm, event) {
+  event.stopPropagation();
+  const term = decodeURIComponent(encodedTerm);
+  const entry = glossary.terms.find(t => t.term === term);
+  if (!entry) return;
+
+  document.getElementById('gloss-popup')?.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'gloss-popup';
+  popup.className = 'gloss-popup';
+  popup.innerHTML = `
+    <div class="gloss-popup-head">
+      <strong>${escapeChatHtml(entry.term)}</strong>
+      <button onclick="document.getElementById('gloss-popup').remove()">✕</button>
+    </div>
+    <p class="gloss-short">${escapeChatHtml(entry.short)}</p>
+    ${entry.example ? `<p class="gloss-example"><span>Misol:</span> ${escapeChatHtml(entry.example)}</p>` : ''}`;
+
+  document.body.appendChild(popup);
+
+  // Ekrandan chiqib ketmasligi uchun joylashuvni to'g'rilash
+  const rect = event.target.getBoundingClientRect();
+  const width = 320;
+  let left = rect.left + window.scrollX;
+  if (left + width > window.innerWidth - 16) left = window.innerWidth - width - 16;
+  popup.style.left = `${Math.max(16, left)}px`;
+  popup.style.top = `${rect.bottom + window.scrollY + 8}px`;
+
+  setTimeout(() => {
+    document.addEventListener('click', function close(e) {
+      if (!e.target.closest('#gloss-popup')) {
+        document.getElementById('gloss-popup')?.remove();
+        document.removeEventListener('click', close);
+      }
+    });
+  }, 0);
+}
+
+// ══════════════════════════════════════════════
+// LOTLAR — "har bir lot mohiyatini tushuntirish"
+// ══════════════════════════════════════════════
+const lotCache = new Map();
+
+async function loadLotsForTender(tenderId) {
+  const container = document.getElementById('lots-container');
+  if (!container) return;
+
+  try {
+    // Lotlarni ko'rish ochiq — ro'yxatdan o'tish shart emas
+    const r = await apiFetch(`/api/tenders/${tenderId}/lots`, { auth: false });
+    const data = await r.json().catch(() => ({}));
+
+    if (!r.ok || !data.lots?.length) {
+      container.innerHTML = '<p class="lots-empty">Bu tender uchun lot ma\'lumoti yo\'q.</p>';
+      return;
+    }
+
+    data.lots.forEach(lot => lotCache.set(lot.id, lot));
+    container.innerHTML = data.lots.map(renderLotCard).join('');
+  } catch {
+    container.innerHTML = '<p class="lots-empty">Lotlarni yuklab bo\'lmadi.</p>';
+  }
+}
+
+function renderLotCard(lot) {
+  const kun = Math.ceil((new Date(lot.deadline) - new Date()) / 86400000);
+  const narx = new Intl.NumberFormat('uz-UZ').format(lot.startPrice);
+
+  return `
+  <div class="lot-card" id="lot-${lot.id}">
+    <div class="lot-head">
+      <span class="lot-number">LOT №${lot.lotNumber}</span>
+      <span class="lot-deadline ${kun < 0 ? 'expired' : kun < 7 ? 'urgent' : ''}">
+        ${kun < 0 ? 'Muddat tugagan' : `${kun} kun qoldi`}
+      </span>
+    </div>
+    <h5 class="lot-title">${escapeChatHtml(lot.title)}</h5>
+    <div class="lot-meta">
+      <span><strong>Boshlang'ich narx:</strong> ${narx} so'm</span>
+      ${lot.quantity ? `<span><strong>Miqdori:</strong> ${lot.quantity} ${escapeChatHtml(lot.unit || '')}</span>` : ''}
+    </div>
+
+    <div class="lot-actions">
+      <button class="btn-lot-explain" onclick="explainLotAction('${lot.id}')">
+        💡 Oddiy tilda tushuntir
+      </button>
+      <button class="btn-lot-fit" onclick="checkLotFitAction('${lot.id}')">
+        🎯 Menga mos keladimi?
+      </button>
+    </div>
+
+    <div class="lot-output" id="lot-output-${lot.id}"></div>
+  </div>`;
+}
+
+async function explainLotAction(lotId) {
+  const out = document.getElementById(`lot-output-${lotId}`);
+  if (!out) return;
+
+  const cached = lotCache.get(lotId);
+  // Tushuntirish allaqachon tayyor bo'lsa — serverga umuman bormaymiz
+  if (cached?.explanation?.xulosa) {
+    out.innerHTML = renderExplanation(cached.explanation);
+    return;
+  }
+
+  out.innerHTML = '<div class="lot-loading">Tushuntirish tayyorlanmoqda...</div>';
+
+  try {
+    const data = await apiJson(`/api/lots/${lotId}/explain`, { method: 'POST' });
+    if (cached) cached.explanation = data.explanation;
+    out.innerHTML = renderExplanation(data.explanation);
+  } catch (err) {
+    out.innerHTML = `<div class="lot-error">⚠️ ${escapeChatHtml(err.message)}</div>`;
+  }
+}
+
+function renderExplanation(e) {
+  // Avval HTML-escape, keyin atamalarni belgilash — tartib muhim
+  const safe = (matn) => linkifyTerms(escapeChatHtml(matn || ''));
+  const blok = (sarlavha, matn) => matn
+    ? `<div class="exp-block"><span class="exp-label">${sarlavha}</span><p>${safe(matn)}</p></div>`
+    : '';
+
+  return `
+  <div class="lot-explanation">
+    <div class="exp-summary">${safe(e.xulosa)}</div>
+    ${blok('Nima sotib olinmoqda?', e.nima)}
+    ${blok('Kim qatnasha oladi?', e.kim)}
+    ${e.hujjatlar?.length ? `
+      <div class="exp-block">
+        <span class="exp-label">Qanday hujjat kerak?</span>
+        <ul>${e.hujjatlar.map(h => `<li>${safe(h)}</li>`).join('')}</ul>
+      </div>` : ''}
+    ${blok('Qancha pul?', e.pul)}
+    ${blok('Qachongacha?', e.muddat)}
+    <div class="exp-hint">💡 Tagi chizilgan so'z ustiga bosing — izohi chiqadi.</div>
+    ${e.model ? `<div class="exp-source">Manba: ${escapeChatHtml(e.model)}</div>` : ''}
+  </div>`;
+}
+
+async function checkLotFitAction(lotId) {
+  const out = document.getElementById(`lot-output-${lotId}`);
+  if (!out) return;
+
+  out.innerHTML = '<div class="lot-loading">Tekshirilmoqda...</div>';
+
+  // Profil: kabinetdagi ma'lumot yoki hujjat formasidan
+  const profile = {
+    experience: document.getElementById('doc-experience')?.value || '',
+    company: state.user?.company || '',
+    soha: state.filters.soha,
+    hudud: state.filters.hudud,
+  };
+
+  try {
+    const data = await apiJson(`/api/lots/${lotId}/fit`, {
+      method: 'POST',
+      auth: false,
+      body: JSON.stringify(profile),
+    });
+    out.innerHTML = renderFit(data.fit);
+  } catch (err) {
+    out.innerHTML = `<div class="lot-error">⚠️ ${escapeChatHtml(err.message)}</div>`;
+  }
+}
+
+function renderFit(fit) {
+  const rang = { mos: 'fit-ok', shoshilinch: 'fit-warn', mos_emas: 'fit-bad' }[fit.verdict] || '';
+  return `
+  <div class="lot-fit ${rang}">
+    <div class="fit-verdict">${escapeChatHtml(fit.verdictText)}</div>
+    ${fit.blockers?.length ? `
+      <div class="fit-group">
+        <span class="exp-label">To'siqlar</span>
+        <ul>${fit.blockers.map(b => `<li>❌ ${escapeChatHtml(b)}</li>`).join('')}</ul>
+      </div>` : ''}
+    ${fit.reasons?.length ? `
+      <div class="fit-group">
+        <span class="exp-label">Tahlil</span>
+        <ul>${fit.reasons.map(r => `<li>${escapeChatHtml(r)}</li>`).join('')}</ul>
+      </div>` : ''}
+    <p class="fit-note">Bu — avtomatik dastlabki baho. Yakuniy qarorni e'lon shartlarini o'qib chiqib qabul qiling.</p>
+  </div>`;
 }
 
 function goToDocFromTender(id) {
@@ -642,9 +1185,8 @@ async function compareTwoTenders(tender1Id, tender2Id) {
   showModal('tender-compare-modal');
 
   try {
-    const r = await fetch(`${API}/api/ai/compare`, {
+    const r = await apiFetch('/api/ai/compare', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tender1Id, tender2Id })
     });
     const data = await r.json();
@@ -827,6 +1369,114 @@ function renderCabinet() {
   const companyField = document.getElementById('update-company');
   if (nameField && state.user.name) nameField.value = state.user.name;
   if (companyField && state.user.company) companyField.value = state.user.company;
+
+  renderTelegramPanel();
+  renderBillingPanel();
+}
+
+// ══════════════════════════════════════════════
+// TELEGRAM XABARNOMASI
+// ══════════════════════════════════════════════
+async function renderTelegramPanel() {
+  const box = document.getElementById('cab-telegram');
+  if (!box) return;
+
+  try {
+    const data = await apiJson('/api/auth/telegram-code');
+
+    if (data.linked) {
+      box.innerHTML = `
+        <div class="cab-block-head">
+          <h4>Telegram xabarnomasi</h4>
+          <span class="cab-status ok">Ulangan</span>
+        </div>
+        <p class="cab-block-text">
+          Sizga mos yangi tenderlar chiqqanda Telegram orqali xabar beramiz.
+          Sozlamalarni botning o'zida o'zgartirasiz: <code>/sozlama</code>
+        </p>
+        <button class="btn-cab-secondary" onclick="unlinkTelegram()">Uzish</button>`;
+      return;
+    }
+
+    // Bot sozlanmagan bo'lsa — yolg'on va'da bermaymiz
+    if (!data.botUsername) {
+      box.innerHTML = `
+        <div class="cab-block-head">
+          <h4>Telegram xabarnomasi</h4>
+          <span class="cab-status off">Ulanmagan</span>
+        </div>
+        <p class="cab-block-text">
+          Bu funksiya hozircha yoqilmagan. Administrator botni sozlagach shu yerda paydo bo'ladi.
+        </p>`;
+      return;
+    }
+
+    box.innerHTML = `
+      <div class="cab-block-head">
+        <h4>Telegram xabarnomasi</h4>
+        <span class="cab-status off">Ulanmagan</span>
+      </div>
+      <p class="cab-block-text">
+        Yangi tenderlar haqida Telegram orqali xabar oling.
+      </p>
+      <div class="tg-code-row">
+        <span class="tg-code">${escapeChatHtml(data.code)}</span>
+        <a class="btn-cab-primary" href="${escapeChatHtml(data.deepLink)}" target="_blank" rel="noopener noreferrer">
+          Telegramda ochish
+        </a>
+      </div>
+      <p class="cab-block-hint">
+        Yoki botga qo'lda yuboring: <code>/ulash ${escapeChatHtml(data.code)}</code>
+      </p>`;
+  } catch (err) {
+    box.innerHTML = `<p class="cab-block-text">Telegram ma'lumotini yuklab bo'lmadi.</p>`;
+  }
+}
+
+async function unlinkTelegram() {
+  if (!confirm('Telegram xabarnomasi uziladi. Davom etasizmi?')) return;
+  try {
+    await apiJson('/api/auth/telegram-unlink', { method: 'POST' });
+    showToast('Telegram uzildi', 'info');
+    renderTelegramPanel();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════════════
+// KABINETDAGI TARIF HOLATI
+// ══════════════════════════════════════════════
+async function renderBillingPanel() {
+  const box = document.getElementById('cab-billing');
+  if (!box) return;
+
+  try {
+    const data = await apiJson('/api/billing/me');
+    const pending = data.subscriptions.find(s => s.status === 'pending');
+
+    box.innerHTML = `
+      <div class="cab-block-head">
+        <h4>Tarif</h4>
+        <span class="cab-status ${data.plan === 'free' ? 'off' : 'ok'}">${escapeChatHtml(data.planName)}</span>
+      </div>
+      <div class="cab-usage">
+        <div><span>Bugun ishlatilgan hujjat</span><strong>${data.usedToday.doc} / ${data.limits.docPerDay}</strong></div>
+        <div><span>Bugun ishlatilgan AI xabar</span><strong>${data.usedToday.chat} / ${data.limits.chatPerDay}</strong></div>
+        ${data.planExpiresAt ? `<div><span>Amal qilish muddati</span><strong>${new Date(data.planExpiresAt).toLocaleDateString('uz-UZ')}</strong></div>` : ''}
+      </div>
+      ${pending ? `
+        <div class="cab-pending">
+          To'lov kutilmoqda — hisob-faktura <code>${escapeChatHtml(pending.invoiceNumber)}</code>,
+          ${new Intl.NumberFormat('uz-UZ').format(pending.amount)} so'm.
+        </div>` : ''}
+      ${data.plan === 'free' ? `
+        <button class="btn-cab-primary" onclick="scrollToSection('pricing');showPage('landing-page')">
+          Tariflarni ko'rish
+        </button>` : ''}`;
+  } catch {
+    box.innerHTML = '';
+  }
 }
 
 // QO'SHIMCHA #7: Profil yangilash funksiyasi
@@ -933,9 +1583,8 @@ async function generateDocument(e) {
   showDocLoading(true);
 
   try {
-    const r = await fetch(`${API}/api/generate`, {
+    const r = await apiFetch('/api/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ company, orgForm, director, inn, address, phoneEmail, experience: exp, bankDetails, pastProjects, tenderName, tenderLot, buyerOrg, price, deliveryTerm, tenderSoha })
     });
     const data = await r.json();
@@ -1366,14 +2015,13 @@ async function exportDoc(type) {
   showToast(`7 ta hujjat (${type.toUpperCase()}) tayyorlanmoqda...`, 'info');
 
   try {
-    const r = await fetch(`${API}/api/export/${type}`, {
+    const r = await apiFetch(`/api/export/${type}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: baseTitle, docs })
     });
     if (!r.ok) {
       const err = await r.json().catch(() => ({}));
-      throw new Error(err.error || 'Export error');
+      throw new Error(err.message || err.error || 'Eksport xatosi');
     }
     const blob = await r.blob();
     const url = window.URL.createObjectURL(blob);
@@ -1387,7 +2035,7 @@ async function exportDoc(type) {
     showToast(type === 'word' ? 'Word (7 hujjat) yuklab olindi' : 'PDF (7 hujjat) yuklab olindi', 'success');
   } catch (err) {
     console.error(err);
-    showToast('Eksportda xatolik yuz berdi', 'error');
+    showToast(err.message || 'Eksportda xatolik yuz berdi', 'error');
   }
 }
 
@@ -1414,11 +2062,19 @@ async function loadStrategy(tenderId) {
   </div>`;
 
   try {
-    const r = await fetch(`${API}/api/strategy`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const r = await apiFetch('/api/strategy', {
+      method: 'POST',
       body: JSON.stringify({ tenderId, company, experience: exp })
     });
-    const data = await r.json();
+    const data = await r.json().catch(() => ({}));
+
+    if (!r.ok) {
+      container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-2)">
+        <p style="font-size:18px;margin-bottom:8px">⚠️ ${escapeChatHtml(data.message || data.error || 'Strategiya tayyorlab bo\'lmadi')}</p>
+      </div>`;
+      return;
+    }
+
     if (data.success) {
       state.strategyTender = tender;
       container.innerHTML = renderStrategyContent(data.strategy, tender, data.aiGenerated);
@@ -1664,17 +2320,23 @@ async function sendAIChat(e) {
   document.getElementById('ai-chat-send').disabled = true;
 
   try {
-    const r = await fetch(`${API}/api/chat`, {
+    const r = await apiFetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message,
         tenderContext: chatState.tenderContext,
         history: chatState.history.slice(0, -1).slice(-24)
       })
     });
-    const data = await r.json();
+    const data = await r.json().catch(() => ({}));
     removeTypingIndicator(typingId);
+
+    if (!r.ok) {
+      // Kunlik limit tugadi (429) yoki boshqa server xatosi —
+      // umumiy "ulanib bo'lmadi" o'rniga aniq sabab ko'rsatiladi.
+      appendChatMessage('bot', `⚠️ ${data.message || data.error || 'Server xatosi'}`, false);
+      return;
+    }
 
     if (data.reply) {
       appendChatMessage('bot', data.reply, data.aiGenerated);
@@ -1682,7 +2344,7 @@ async function sendAIChat(e) {
     }
   } catch (err) {
     removeTypingIndicator(typingId);
-    appendChatMessage('bot', '❌ Serverga ulanib bo\'lmadi. Qaytadan urinib ko\'ring.', false);
+    appendChatMessage('bot', `❌ ${err.message || 'Serverga ulanib bo\'lmadi. Qaytadan urinib ko\'ring.'}`, false);
   } finally {
     chatState.isLoading = false;
     document.getElementById('ai-chat-send').disabled = false;
@@ -1761,9 +2423,8 @@ async function getAIRecommendations() {
     </div>`;
 
   try {
-    const r = await fetch(`${API}/api/ai/recommend`, {
+    const r = await apiFetch('/api/ai/recommend', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ company, experience, soha, hudud })
     });
     const data = await r.json();

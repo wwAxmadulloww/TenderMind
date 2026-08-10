@@ -24,4 +24,21 @@ function authMiddleware(req, res, next) {
   }
 }
 
-module.exports = { authMiddleware, extractToken };
+/**
+ * Ixtiyoriy autentifikatsiya: token bo'lsa req.user to'ldiriladi, bo'lmasa
+ * so'rov baribir davom etadi. Ochiq sahifalarda "kirgan foydalanuvchiga
+ * qo'shimcha ma'lumot" ko'rsatish uchun (masalan yo'riqnoma progressi).
+ */
+function optionalAuth(req, res, next) {
+  const token = extractToken(req);
+  if (token) {
+    try {
+      req.user = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
+    } catch {
+      // Yaroqsiz token — anonim sifatida davom etamiz
+    }
+  }
+  return next();
+}
+
+module.exports = { authMiddleware, optionalAuth, extractToken };

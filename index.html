@@ -195,52 +195,13 @@
       <div class="section-header">
         <span class="section-tag" data-i18n="navPricing">Narxlar</span>
       </div>
-      <div class="pricing-grid">
-        <div class="pricing-card">
-          <h3 class="pricing-tier">SINOV</h3>
-          <div class="pricing-price">
-            <span style="font-size: 32px; font-weight: 700; color: var(--text);">0</span>
-            <span style="color: var(--text-3);">so'm/oy</span>
-          </div>
-          <ul class="pricing-features">
-            <li><span style="color:var(--accent);">✓</span> Kuniga 3 ta qidiruv</li>
-            <li><span style="color:var(--accent);">✓</span> 1 marta AI hujjat yasash</li>
-            <li><span style="color:var(--text-3);">✕ Strategiya tahlili</span></li>
-          </ul>
-          <button class="btn-pricing" onclick="showPage('app-page')">Boshlash</button>
-        </div>
-        
-        <div class="pricing-card featured-pricing">
-          <div class="pricing-popular-badge">ENG MASHHUR</div>
-          <h3 class="pricing-tier">PROFESSIONAL</h3>
-          <div class="pricing-price">
-            <span style="font-size: 32px; font-weight: 700; color: var(--text);">390,000</span>
-            <span style="color: var(--text-3);">so'm/oy</span>
-          </div>
-          <ul class="pricing-features">
-            <li><span style="color:var(--accent);">✓</span> Cheksiz qidiruvlar</li>
-            <li><span style="color:var(--accent);">✓</span> Cheksiz AI hujjat yasash</li>
-            <li><span style="color:var(--accent);">✓</span> To'liq AI strategiya tahlili</li>
-            <li><span style="color:var(--accent);">✓</span> Word va PDF eksport</li>
-          </ul>
-          <button class="btn-pricing featured-btn" onclick="showModal('auth-modal')">Obuna bo'lish</button>
-        </div>
-
-        <div class="pricing-card">
-          <h3 class="pricing-tier">KORPORATIV</h3>
-          <div class="pricing-price">
-            <span style="font-size: 32px; font-weight: 700; color: var(--text);">1,200,000</span>
-            <span style="color: var(--text-3);">so'm/oy</span>
-          </div>
-          <ul class="pricing-features">
-            <li><span style="color:var(--accent);">✓</span> 5 ta foydalanuvchi akkaunti</li>
-            <li><span style="color:var(--accent);">✓</span> CRM tizimga API ulanishi</li>
-            <li><span style="color:var(--accent);">✓</span> Shaxsiy AI yurist xizmati</li>
-          </ul>
-          <button class="btn-pricing" onclick="showToast('Sotuv bo\'limiga ulanish', 'info')">Bog'lanish</button>
-        </div>
+      <!-- Narxlar va imkoniyatlar serverdan olinadi (config/plans.js).
+           Shu tufayli sahifadagi ma'lumot amaldagi limitlar bilan
+           har doim mos bo'ladi. -->
+      <div class="pricing-grid" id="pricing-grid">
+        <div class="pricing-loading">Tariflar yuklanmoqda...</div>
       </div>
-      <p class="pricing-disclaimer"><strong>Eslatma:</strong> Barcha to'lovlar rasmiy shartnoma orqali amalga oshiriladi.</p>
+      <p class="pricing-disclaimer" id="pricing-note"></p>
     </div>
   </section>
 
@@ -271,6 +232,9 @@
           <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">RU</button>
           <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
         </div>
+        <button class="btn-guide-open" onclick="openGuide()" title="Tender bilan birinchi marta ishlayapsizmi? Shu yerdan boshlang">
+          🎓 Boshlang'ich yo'riqnoma
+        </button>
         <div class="ai-status"><span class="ai-dot pulsing"></span>AI faol</div>
         <div id="profile-menu-app" class="profile-menu" style="position:relative">
           <button class="btn-app-auth" id="auth-app-btn" onclick="showModal('auth-modal')" data-i18n="navLogIn">Kirish</button>
@@ -554,6 +518,12 @@
             </div>
           </div>
 
+          <!-- Tarif holati va Telegram xabarnomasi -->
+          <div class="cabinet-grid" style="margin-top:20px">
+            <div class="cabinet-card" id="cab-billing"></div>
+            <div class="cabinet-card" id="cab-telegram"></div>
+          </div>
+
           <!-- QO'SHIMCHA #8: Profil yangilash panel -->
           <div class="cab-section" style="margin-top:24px">
             <h4 class="cab-section-title" style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:12px">✏️ Profil Yangilash</h4>
@@ -692,6 +662,36 @@
 </div>
 
 <!-- ═══════════════════════ AI RECOMMEND MODAL ═══ -->
+<!-- ═══ HISOB-FAKTURA ═══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="invoice-modal" onclick="if(event.target===this)hideModal('invoice-modal')">
+  <div class="modal-box invoice-box">
+    <div class="modal-content">
+      <div class="modal-header" style="padding:24px 28px 8px">
+        <h2 style="color:var(--text);font-size:1.25em">Hisob-faktura</h2>
+        <button class="modal-close" onclick="hideModal('invoice-modal')">✕</button>
+      </div>
+      <div class="modal-body" id="invoice-body" style="padding:0 28px 28px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BOSHLANG'ICH YO'RIQNOMA ═══════════════════════════════════════
+     Bilimi kam foydalanuvchilar uchun kirish nuqtasi. Ro'yxatdan
+     o'tmasdan ham to'liq o'qish mumkin. -->
+<div class="modal-overlay" id="guide-modal" onclick="if(event.target===this)hideModal('guide-modal')">
+  <div class="modal-box guide-box">
+    <div class="modal-content">
+      <div class="modal-header" style="padding:24px 28px 8px">
+        <h2 style="color:var(--text);font-size:1.3em;display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.1em">🎓</span> Birinchi tenderingiz
+        </h2>
+        <button class="modal-close" onclick="hideModal('guide-modal')">✕</button>
+      </div>
+      <div class="modal-body" id="guide-body" style="padding:0 28px 28px"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="ai-recommend-modal" onclick="if(event.target===this)hideModal('ai-recommend-modal')">
   <div class="modal-box tender-modal-box" style="max-width:800px">
     <div class="modal-content">
