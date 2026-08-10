@@ -28,6 +28,7 @@ const lotsRouter = require('./routes/lots');
 const learnRouter = require('./routes/learn');
 const adminRouter = require('./routes/admin');
 const billingRouter = require('./routes/billing');
+const publicRouter = require('./routes/public');
 const aiRouter = require('./routes/ai');
 const exportRouter = require('./routes/export');
 
@@ -99,6 +100,9 @@ app.use('/api', aiRouter);
 app.use('/api', exportRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/billing', billingRouter);
+
+// Ochiq, qidiruv tizimlari uchun indekslanadigan sahifalar
+app.use('/', publicRouter);
 
 // ── Error Handlers ──────────────────────────────────────────────────
 // 404 Handler

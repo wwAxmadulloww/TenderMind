@@ -27,7 +27,7 @@ Haqiqiy baza bilan ishlash uchun `.env` da `MONGODB_URI` ni to'ldiring va `npm s
 | `npm start` | Serverni ishga tushirish |
 | `npm run dev` | Avtomatik qayta yuklanadigan rejim |
 | `npm run dev:local` | Xotiradagi MongoDB bilan (Atlas kerak emas) |
-| `npm test` | Testlar (105 ta) |
+| `npm test` | Testlar (124 ta) |
 | `npm run ingest -- file --path=./data/namuna-tenderlar.json` | Ma'lumot import qilish |
 | `npm run bot` | Telegram botni ishga tushirish |
 | `npm run make-admin -- +998901234567` | Foydalanuvchini admin qilish |
@@ -72,6 +72,18 @@ Tushuntirish **AI ulanmagan bo'lsa ham to'liq ishlaydi** — lot ma'lumotidan qu
 ### Ta'lim qatlami
 - 18 ta atama lug'ati — matnda uchraganda bosilsa izoh va hayotiy misol chiqadi.
 - "Birinchi tenderingiz" — 6 qadamli yo'riqnoma, ro'yxatdan o'tmasdan ham o'qiladi.
+
+### Qidiruv tizimlari uchun sahifalar
+SPA mazmuni JavaScript'siz ko'rinmaydi, shuning uchun har bir tender uchun alohida server tomonda render qilinadigan sahifa bor:
+
+| Manzil | Nima |
+|---|---|
+| `/tender/:id` | To'liq HTML: lotlar, tushuntirishlar, meta teglar, JSON-LD |
+| `/tenderlar/:soha` | Soha bo'yicha ro'yxat — crawler tenderlarga shu orqali o'tadi |
+| `/sitemap.xml` | Faqat indekslanadigan yozuvlar |
+| `/robots.txt` | `/admin` va `/api/` yopiq |
+
+**DEMO yozuvlar `noindex` bilan chiqadi** — o'ylab topilgan tender qidiruv natijalariga tushmasligi kerak. Muddati tugaganlar ham shunday.
 
 ### Tarif va limitlar
 `config/plans.js` da — narx, imkoniyat va limitlar bir joyda. Sayt narxlar bo'limi shu manbadan render qilinadi, ya'ni reklama va amaldagi limit har doim mos.
@@ -155,9 +167,9 @@ AI kalitlari **formati bo'yicha** tekshiriladi (`gsk_`, `sk-`, `AIza`). Noto'g'r
 npm test
 ```
 
-105 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
+124 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
 
-Qamrov: telefon normalizatsiyasi, tarif limitlari, AI kalit validatsiyasi, route himoyasi, baza uzilgandagi xatti-harakat, lot tushuntirish, ta'lim moduli, admin huquqi, to'lov oqimi, ingestion normalizatsiyasi va dedupe, robots.txt qoidalari, Telegram buyruqlari va xabar formatlash.
+Qamrov: telefon normalizatsiyasi, tarif limitlari, AI kalit validatsiyasi, route himoyasi, baza uzilgandagi xatti-harakat, lot tushuntirish, ta'lim moduli, admin huquqi, to'lov oqimi, ingestion normalizatsiyasi va dedupe, robots.txt qoidalari, Telegram buyruqlari, SEO sahifalari va indekslash qoidalari.
 
 ---
 
@@ -180,4 +192,3 @@ Bularni ochiq aytish kerak:
 1. **Haqiqiy tender manbasi ulanmagan.** Ingestion karkasi tayyor va test qilingan, lekin portal adapteri yo'q — `xarid.uz` ga ulanish yoki rasmiy kelishuv kerak. Hozircha fayldan import qilinadi.
 2. **To'lov qo'lda tasdiqlanadi.** Payme/Click avtomatik integratsiyasi uchun merchant kaliti kerak. Kod tayyor, kalit yo'q — shuning uchun bu usullar "sozlanmagan" deb qaytariladi.
 3. **Fond birjasi integratsiyasi yo'q.** Qimmatli qog'ozlar savdosi litsenziyalanadigan faoliyat; bu MVP doirasidan tashqarida.
-4. **SEO cheklangan.** Sayt bitta SPA sahifa — tenderlar Google'da indekslanmaydi. Har bir tender uchun server tomonda render qilinadigan sahifa kerak.

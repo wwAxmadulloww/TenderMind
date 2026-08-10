@@ -69,8 +69,11 @@ async function createTender(req, res) {
     ...body,
     budgetRaw,
     budget: body.budget || new Intl.NumberFormat('uz-UZ').format(budgetRaw),
-    // Admin qo'lda kiritgan yozuv demo emas
+    // Admin qo'lda kiritgan yozuv demo emas va tekshirilgan hisoblanadi —
+    // uni kiritishning o'zi tekshiruv. Avtomatik ingestion esa
+    // isVerified: false bilan keladi va alohida tasdiqlanadi.
     isDemo: body.isDemo === true,
+    isVerified: body.isVerified !== false,
     createdBy: req.dbUser.phone,
   });
 
