@@ -8,6 +8,11 @@
 
 'use strict';
 
+import {
+  t, initLang, setLang, getLang, onLangChange,
+  sectorName, regionName, sectorKeys, regionKeys, LANGS,
+} from './i18n.js';
+
 // ── Holat ───────────────────────────────────────────────────────────
 const state = {
   token: localStorage.getItem('tm_token') || '',
@@ -43,26 +48,11 @@ function daysLeft(deadline) {
 /** Muddatni odam o'qiydigan shaklda: "12 kun", "bugun", "tugagan" */
 function deadlineText(deadline) {
   const d = daysLeft(deadline);
-  if (d < 0) return { text: 'tugagan', urgent: true };
-  if (d === 0) return { text: 'bugun tugaydi', urgent: true };
-  if (d === 1) return { text: '1 kun qoldi', urgent: true };
-  return { text: `${d} kun qoldi`, urgent: d <= 7 };
+  if (d < 0) return { text: t('time.expired'), urgent: true };
+  if (d === 0) return { text: t('time.today'), urgent: true };
+  if (d === 1) return { text: t('time.oneDay'), urgent: true };
+  return { text: t('time.days', { n: d }), urgent: d <= 7 };
 }
-
-const SOHA = {
-  it: 'IT', qurilish: 'Qurilish', tibbiyot: 'Tibbiyot', oziq: 'Oziq-ovqat',
-  transport: 'Transport', talim: "Ta'lim", ekologiya: 'Ekologiya',
-  qishloq: "Qishloq xo'jaligi", boshqa: 'Boshqa',
-};
-
-const HUDUD = {
-  toshkent: 'Toshkent', samarqand: 'Samarqand', buxoro: 'Buxoro', andijon: 'Andijon',
-  namangan: 'Namangan', fargona: "Farg'ona", qashqadaryo: 'Qashqadaryo',
-  surxondaryo: 'Surxondaryo', xorazm: 'Xorazm', navoiy: 'Navoiy', jizzax: 'Jizzax',
-  sirdaryo: 'Sirdaryo', qoraqalpogiston: "Qoraqalpog'iston", boshqa: 'Boshqa',
-};
-
-const labelOf = (map, key) => map[key] || key;
 
 // ── Server bilan aloqa ──────────────────────────────────────────────
 class ApiError extends Error {
@@ -80,7 +70,7 @@ class ApiError extends Error {
 async function api(path, { auth = false, ...options } = {}) {
   if (auth && !state.token) {
     openModal('auth-modal');
-    throw new ApiError('Bu amal uchun tizimga kiring', 401);
+    throw new ApiError(t('auth.needSignin'), 401);
   }
 
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
@@ -90,13 +80,13 @@ async function api(path, { auth = false, ...options } = {}) {
   try {
     response = await fetch(path, { ...options, headers });
   } catch {
-    throw new ApiError('Serverga ulanib bo\'lmadi. Internetni tekshiring.', 0);
+    throw new ApiError(t('common.offline'), 0);
   }
 
   if (response.status === 401 && state.token) {
     signOut({ silent: true });
     openModal('auth-modal');
-    throw new ApiError('Sessiya tugadi. Qaytadan kiring.', 401);
+    throw new ApiError(t('auth.expired'), 401);
   }
 
   return response;
@@ -105,7 +95,7 @@ async function api(path, { auth = false, ...options } = {}) {
 async function apiJson(path, options) {
   const response = await api(path, options);
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new ApiError(data.message || data.error || 'Server xatosi', response.status, data);
+  if (!response.ok) throw new ApiError(data.message || data.error || t('common.serverError'), response.status, data);
   return data;
 }
 
@@ -221,7 +211,7 @@ function signOut({ silent = false } = {}) {
   renderAuthState();
   renderResults();
   if (!silent) {
-    toast('Hisobdan chiqdingiz');
+    toast(t('auth.signedOut'));
     go('browse');
   }
 }
@@ -246,10 +236,10 @@ document.addEventListener('click', (e) => {
 $$('[data-auth-tab]').forEach(tab => {
   tab.addEventListener('click', () => {
     const mode = tab.dataset.authTab;
-    $$('[data-auth-tab]').forEach(t => t.setAttribute('aria-selected', String(t === tab)));
+    $$('[data-auth-tab]').forEach(el => el.setAttribute('aria-selected', String(el === tab)));
     $('#login-form').hidden = mode !== 'login';
     $('#register-form').hidden = mode !== 'register';
-    $('#auth-title').textContent = mode === 'login' ? 'Hisobingizga kiring' : 'Yangi hisob yarating';
+    $('#auth-title').textContent = t(mode === 'login' ? 'auth.signinTitle' : 'auth.registerTitle');
   });
 });
 
@@ -271,7 +261,7 @@ $('#login-form').addEventListener('submit', async (e) => {
     persistSession(data);
     closeModal('auth-modal');
     form.reset();
-    toast(`Xush kelibsiz, ${data.user.name.split(' ')[0]}`, 'success');
+    toast(t('auth.welcome', { name: data.user.name.split(' ')[0] }), 'success');
     await Promise.all([loadSaved(), loadWon()]);
     renderResults();
   } catch (err) {
@@ -301,7 +291,7 @@ $('#register-form').addEventListener('submit', async (e) => {
     persistSession(data);
     closeModal('auth-modal');
     form.reset();
-    toast('Hisob yaratildi. Qo\'llanmadan boshlashni tavsiya qilamiz.', 'success');
+    toast(t('auth.registered'), 'success');
   } catch (err) {
     // Server maydonlar bo'yicha xato qaytarsa, birinchisini ko'rsatamiz
     const details = err.data.errors;
@@ -335,9 +325,9 @@ async function loadResults() {
   } catch (err) {
     $('#results').innerHTML = `
       <div class="empty">
-        <h3>Ro'yxatni yuklab bo'lmadi</h3>
+        <h3>${esc(t('results.failTitle'))}</h3>
         <p>${esc(err.message)}</p>
-        <button type="button" class="btn btn-secondary" id="retry-results">Qaytadan urinish</button>
+        <button type="button" class="btn btn-secondary" id="retry-results">${esc(t('results.retry'))}</button>
       </div>`;
     $('#retry-results')?.addEventListener('click', loadResults);
     $('#results-count').textContent = '';
@@ -351,7 +341,7 @@ function renderSkeleton() {
       <div class="skeleton" style="width:70%;height:15px"></div>
       <div class="skeleton" style="width:40%"></div>
     </div>`).join('');
-  $('#results-count').textContent = 'Yuklanmoqda…';
+  $('#results-count').textContent = t('results.loading');
 }
 
 function renderResults() {
@@ -359,15 +349,15 @@ function renderResults() {
   const list = $('#results');
 
   $('#results-count').innerHTML = total
-    ? `<b>${som(total)}</b> ta e'lon topildi`
-    : 'Hech narsa topilmadi';
+    ? `<b>${som(total)}</b> ${esc(t('results.found'))}`
+    : esc(t('results.none'));
 
   if (!items.length) {
     list.innerHTML = `
       <div class="empty">
-        <h3>Bu shartlarga mos e'lon yo'q</h3>
-        <p>Filtrlarni kengaytiring yoki boshqa so'z bilan qidiring.</p>
-        <button type="button" class="btn btn-secondary" id="empty-reset">Filtrlarni tozalash</button>
+        <h3>${esc(t('results.emptyTitle'))}</h3>
+        <p>${esc(t('results.emptyText'))}</p>
+        <button type="button" class="btn btn-secondary" id="empty-reset">${esc(t('filter.reset'))}</button>
       </div>`;
     $('#empty-reset')?.addEventListener('click', resetFilters);
     return;
@@ -376,44 +366,44 @@ function renderResults() {
   list.innerHTML = items.map(renderRow).join('');
 }
 
-function renderRow(t) {
-  const deadline = deadlineText(t.deadline);
-  const saved = state.savedIds.has(t.id);
-  const lotCount = t.lotCount || 1;
+function renderRow(item) {
+  const deadline = deadlineText(item.deadline);
+  const saved = state.savedIds.has(item.id);
+  const lotCount = item.lotCount || 1;
 
   return `
-  <article class="row" role="listitem" data-id="${esc(t.id)}">
+  <article class="row" role="listitem" data-id="${esc(item.id)}">
     <div class="row-top">
-      <span class="row-sector">${esc(labelOf(SOHA, t.soha))}</span>
+      <span class="row-sector">${esc(sectorName(item.soha))}</span>
       <span class="row-dot">·</span>
-      <span class="row-region">${esc(labelOf(HUDUD, t.hudud))}</span>
-      ${t.isDemo ? '<span class="chip chip-caution">DEMO</span>' : ''}
-      ${t.isVerified === false && !t.isDemo ? '<span class="chip chip-neutral">Tekshirilmagan</span>' : ''}
-      ${t.isVerified && !t.isDemo ? '<span class="chip chip-verified">Tasdiqlangan</span>' : ''}
+      <span class="row-region">${esc(regionName(item.hudud))}</span>
+      ${item.isDemo ? `<span class="chip chip-caution">${esc(t('row.demo'))}</span>` : ''}
+      ${item.isVerified === false && !item.isDemo ? `<span class="chip chip-neutral">${esc(t('row.unverified'))}</span>` : ''}
+      ${item.isVerified && !item.isDemo ? `<span class="chip chip-verified">${esc(t('row.verified'))}</span>` : ''}
     </div>
 
-    <a href="/tender/${esc(t.id)}" class="row-title" style="display:block">${esc(t.title)}</a>
-    <p class="row-org">${esc(t.org)}</p>
+    <a href="/tender/${esc(item.id)}" class="row-title" style="display:block">${esc(item.title)}</a>
+    <p class="row-org">${esc(item.org)}</p>
 
     <div class="row-facts">
-      <span class="row-budget">${esc(t.budget)} so'm</span>
+      <span class="row-budget">${esc(item.budget)} ${esc(t('row.som'))}</span>
 
       <span class="row-fact">
-        <span class="row-fact-label">Muddat</span>
+        <span class="row-fact-label">${esc(t('row.deadline'))}</span>
         <span class="row-fact-value${deadline.urgent ? ' is-urgent' : ''}">${esc(deadline.text)}</span>
       </span>
 
       <span class="row-fact">
-        <span class="row-fact-label">Lot</span>
+        <span class="row-fact-label">${esc(t('row.lots'))}</span>
         <span class="row-fact-value">${lotCount}</span>
       </span>
 
       <span class="row-actions">
-        <button type="button" class="icon-btn" data-explain="${esc(t.id)}"
-                title="Oddiy tilda tushuntirish" aria-label="Oddiy tilda tushuntirish">?</button>
-        <button type="button" class="icon-btn" data-save="${esc(t.id)}"
-                aria-pressed="${saved}" title="${saved ? 'Saqlanganlardan olib tashlash' : 'Saqlash'}"
-                aria-label="Saqlash">
+        <button type="button" class="icon-btn" data-explain="${esc(item.id)}"
+                title="${esc(t('row.explain'))}" aria-label="${esc(t('row.explain'))}">?</button>
+        <button type="button" class="icon-btn" data-save="${esc(item.id)}"
+                aria-pressed="${saved}" title="${esc(t(saved ? 'row.unsave' : 'row.save'))}"
+                aria-label="${esc(t('row.save'))}">
           <svg width="15" height="15" viewBox="0 0 20 20" fill="${saved ? 'currentColor' : 'none'}" aria-hidden="true">
             <path d="M5 3h10v14l-5-3.5L5 17z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
           </svg>
@@ -421,7 +411,7 @@ function renderRow(t) {
       </span>
     </div>
 
-    <div class="row-explain" id="explain-${esc(t.id)}" hidden></div>
+    <div class="row-explain" id="explain-${esc(item.id)}" hidden></div>
   </article>`;
 }
 
@@ -474,7 +464,7 @@ async function toggleRowExplain(tenderId) {
   box.hidden = false;
   if (box.dataset.loaded) return;
 
-  box.innerHTML = '<span class="small muted">Yuklanmoqda…</span>';
+  box.innerHTML = `<span class="small muted">${esc(t('results.loading'))}</span>`;
 
   try {
     const { lots } = await apiJson(`/api/tenders/${tenderId}/lots`);
@@ -482,11 +472,11 @@ async function toggleRowExplain(tenderId) {
 
     if (explained) {
       box.innerHTML = esc(explained.explanation.xulosa)
-        + ` <a href="/tender/${esc(tenderId)}" style="white-space:nowrap">Batafsil →</a>`;
+        + ` <a href="/tender/${esc(tenderId)}" style="white-space:nowrap">${esc(t('row.more'))}</a>`;
     } else {
       // Tushuntirish hali yaratilmagan — yolg'on va'da bermaymiz
-      box.innerHTML = `Bu e'lon uchun tushuntirish hali tayyorlanmagan.
-        <a href="/tender/${esc(tenderId)}">Lotlarni ko'rish →</a>`;
+      box.innerHTML = `${esc(t('row.noExplanation'))}
+        <a href="/tender/${esc(tenderId)}">${esc(t('row.viewLots'))}</a>`;
     }
     box.dataset.loaded = '1';
   } catch (err) {
@@ -495,16 +485,35 @@ async function toggleRowExplain(tenderId) {
 }
 
 // ── Filtrlar ───────────────────────────────────────────────────────
+/**
+ * Filtr va saralash ro'yxatlari JS da quriladi — til almashtirilganda
+ * ular ham qayta chiziladi. HTML da qo'lda yozilgan variantlar tarjima
+ * qilinmay qolib ketardi.
+ */
 function renderSectorFilter() {
-  $('#filter-sectors').innerHTML = [['all', 'Barchasi'], ...Object.entries(SOHA)]
+  const sectors = [['all', t('filter.all')], ...sectorKeys().map(k => [k, sectorName(k)])];
+  $('#filter-sectors').innerHTML = sectors
     .map(([key, name]) => `
       <button type="button" class="filter-option" data-soha="${key}"
               aria-pressed="${state.filters.soha === key}">${esc(name)}</button>`)
     .join('');
 
-  $('#filter-region').innerHTML = '<option value="all">Barcha hududlar</option>'
-    + Object.entries(HUDUD).map(([key, name]) =>
-        `<option value="${key}"${state.filters.hudud === key ? ' selected' : ''}>${esc(name)}</option>`).join('');
+  $('#filter-region').innerHTML = `<option value="all">${esc(t('filter.allRegions'))}</option>`
+    + regionKeys().map(key =>
+        `<option value="${key}"${state.filters.hudud === key ? ' selected' : ''}>${esc(regionName(key))}</option>`).join('');
+
+  const option = (value, label, selected) =>
+    `<option value="${value}"${selected === value ? ' selected' : ''}>${esc(label)}</option>`;
+
+  $('#filter-status').innerHTML =
+      option('active', t('filter.statusActive'), state.filters.status)
+    + option('all', t('filter.statusAll'), state.filters.status)
+    + option('urgent', t('filter.statusUrgent'), state.filters.status);
+
+  $('#sort-select').innerHTML =
+      option('newest', t('results.sortNewest'), state.filters.sort)
+    + option('date', t('results.sortDeadline'), state.filters.sort)
+    + option('budget', t('results.sortBudget'), state.filters.sort);
 }
 
 $('#filter-sectors').addEventListener('click', (e) => {
@@ -558,7 +567,7 @@ async function loadSaved() {
   if (!state.token) return;
   try {
     const items = await apiJson('/api/saved');
-    state.savedIds = new Set(items.map(t => t.id));
+    state.savedIds = new Set(items.map(item => item.id));
   } catch { /* jimgina — bu yordamchi ma'lumot */ }
 }
 
@@ -566,7 +575,7 @@ async function loadWon() {
   if (!state.token) return;
   try {
     const items = await apiJson('/api/won');
-    state.wonIds = new Set(items.map(t => t.id));
+    state.wonIds = new Set(items.map(item => item.id));
   } catch { /* jimgina */ }
 }
 
@@ -579,7 +588,7 @@ async function toggleSave(id, button) {
 
     button.setAttribute('aria-pressed', String(data.saved));
     button.querySelector('svg').setAttribute('fill', data.saved ? 'currentColor' : 'none');
-    toast(data.saved ? 'Saqlandi' : 'Saqlanganlardan olib tashlandi');
+    toast(t(data.saved ? 'account.saved' : 'row.unsave'));
   } catch (err) {
     toast(err.message, 'error');
   }
@@ -596,13 +605,11 @@ async function loadWork() {
     apiJson('/api/won').catch(() => []),
   ]);
 
-  state.savedIds = new Set(saved.map(t => t.id));
-  state.wonIds = new Set(won.map(t => t.id));
+  state.savedIds = new Set(saved.map(item => item.id));
+  state.wonIds = new Set(won.map(item => item.id));
 
-  renderWorkList('#saved-list', saved, 'Hali hech narsa saqlamagansiz.',
-    'Tenderlar ro\'yxatida yoqqan e\'lonni belgilab qo\'ying — shu yerda to\'planadi.');
-  renderWorkList('#won-list', won, 'Hali yutgan tenderingiz belgilanmagan.',
-    'Tenderni yutganingizda uni shu yerga qo\'shing — statistikangiz to\'planib boradi.');
+  renderWorkList('#saved-list', saved, t('work.savedEmptyTitle'), t('work.savedEmptyText'));
+  renderWorkList('#won-list', won, t('work.wonEmptyTitle'), t('work.wonEmptyText'));
 
   $('#compare-btn').hidden = saved.length < 2;
 }
@@ -614,29 +621,29 @@ function renderWorkList(selector, items, emptyTitle, emptyText) {
     return;
   }
 
-  box.innerHTML = items.map(t => {
-    const deadline = deadlineText(t.deadline);
+  box.innerHTML = items.map(item => {
+    const deadline = deadlineText(item.deadline);
     const selectable = selector === '#saved-list';
     return `
     <article class="row">
       <div class="row-top">
-        <span class="row-sector">${esc(labelOf(SOHA, t.soha))}</span>
+        <span class="row-sector">${esc(sectorName(item.soha))}</span>
         <span class="row-dot">·</span>
-        <span class="row-region">${esc(labelOf(HUDUD, t.hudud))}</span>
-        ${t.isDemo ? '<span class="chip chip-caution">DEMO</span>' : ''}
+        <span class="row-region">${esc(regionName(item.hudud))}</span>
+        ${item.isDemo ? `<span class="chip chip-caution">${esc(t('row.demo'))}</span>` : ''}
       </div>
-      <a href="/tender/${esc(t.id)}" class="row-title" style="display:block">${esc(t.title)}</a>
-      <p class="row-org">${esc(t.org)}</p>
+      <a href="/tender/${esc(item.id)}" class="row-title" style="display:block">${esc(item.title)}</a>
+      <p class="row-org">${esc(item.org)}</p>
       <div class="row-facts">
-        <span class="row-budget">${esc(t.budget)} so'm</span>
+        <span class="row-budget">${esc(item.budget)} ${esc(t('row.som'))}</span>
         <span class="row-fact">
-          <span class="row-fact-label">Muddat</span>
+          <span class="row-fact-label">${esc(t('row.deadline'))}</span>
           <span class="row-fact-value${deadline.urgent ? ' is-urgent' : ''}">${esc(deadline.text)}</span>
         </span>
         ${selectable ? `
         <span class="row-actions">
           <label class="small muted" style="display:flex;align-items:center;gap:6px">
-            <input type="checkbox" data-compare="${esc(t.id)}"> solishtirish
+            <input type="checkbox" data-compare="${esc(item.id)}"> ${esc(t('work.compareLabel'))}
           </label>
         </span>` : ''}
       </div>
@@ -655,18 +662,18 @@ $('#saved-list').addEventListener('change', (e) => {
   if (state.compareSelection.size > 2) {
     box.checked = false;
     state.compareSelection.delete(box.dataset.compare);
-    toast('Bir vaqtda ikkitasini solishtirish mumkin');
+    toast(t('work.compareLimit'));
   }
 });
 
 $('#compare-btn').addEventListener('click', async () => {
   if (state.compareSelection.size !== 2) {
-    toast('Solishtirish uchun ikkita e\'lonni belgilang');
+    toast(t('work.compareHint'));
     return;
   }
 
   const [first, second] = [...state.compareSelection];
-  openInfo('Solishtirish', '<p class="muted">Tahlil tayyorlanmoqda…</p>');
+  openInfo(t('work.compareTitle'), `<p class="muted">${esc(t('work.comparing'))}</p>`);
 
   try {
     const data = await apiJson('/api/ai/compare', {
@@ -683,23 +690,23 @@ function renderComparison(c, aiGenerated) {
   const list = (items) => (items || []).map(x => `<li>${esc(x)}</li>`).join('');
   $('#info-body').innerHTML = `
     <div class="plain">
-      <span class="plain-label">Xulosa</span>
+      <span class="plain-label">${esc(t('work.compareTitle'))}</span>
       <div class="plain-item"><p>${esc(c.summary || '')}</p></div>
     </div>
     <div class="grid-2" style="margin-top:var(--s4)">
       <div>
-        <h4 class="eyebrow" style="margin-bottom:var(--s2)">Birinchisining afzalliklari</h4>
+        <h4 class="eyebrow" style="margin-bottom:var(--s2)">${esc(t('work.adv1'))}</h4>
         <ul style="list-style:disc;padding-left:18px">${list(c.advantages1)}</ul>
       </div>
       <div>
-        <h4 class="eyebrow" style="margin-bottom:var(--s2)">Ikkinchisining afzalliklari</h4>
+        <h4 class="eyebrow" style="margin-bottom:var(--s2)">${esc(t('work.adv2'))}</h4>
         <ul style="list-style:disc;padding-left:18px">${list(c.advantages2)}</ul>
       </div>
     </div>
     <div class="notice notice-seal" style="margin-top:var(--s4)">
-      <strong>Tavsiya:</strong> ${esc(c.recommendation || '')}
+      <strong>${esc(t('work.recommendation'))}</strong> ${esc(c.recommendation || '')}
     </div>
-    ${!aiGenerated ? '<p class="small muted" style="margin-top:var(--s3)">Bu tahlil AI siz, faqat raqamlar asosida tuzildi.</p>' : ''}`;
+    ${!aiGenerated ? `<p class="small muted" style="margin-top:var(--s3)">${esc(t('work.noAi'))}</p>` : ''}`;
 }
 
 function openInfo(title, html) {
@@ -744,20 +751,20 @@ async function renderBillingPanel() {
 
     panel.innerHTML = `
       <div class="panel-head">
-        <h3>Tarif</h3>
+        <h3>${esc(t('account.plan'))}</h3>
         <span class="chip ${data.plan === 'free' ? 'chip-neutral' : 'chip-verified'}">${esc(data.planName)}</span>
       </div>
       <div class="grid-2" style="margin-bottom:var(--s4)">
-        ${meter('Bugungi hujjatlar', data.usedToday.doc, data.limits.docPerDay)}
-        ${meter('Bugungi AI xabarlar', data.usedToday.chat, data.limits.chatPerDay)}
+        ${meter(t('account.docsToday'), data.usedToday.doc, data.limits.docPerDay)}
+        ${meter(t('account.chatToday'), data.usedToday.chat, data.limits.chatPerDay)}
       </div>
-      ${data.planExpiresAt ? `<p class="small muted">Amal qilish muddati: ${new Date(data.planExpiresAt).toLocaleDateString('uz-UZ')}</p>` : ''}
+      ${data.planExpiresAt ? `<p class="small muted">${esc(t('account.expires'))}: ${new Date(data.planExpiresAt).toLocaleDateString(getLang())}</p>` : ''}
       ${pending ? `
         <div class="notice notice-caution" style="margin-top:var(--s3)">
-          <strong>To'lov kutilmoqda.</strong> Hisob-faktura ${esc(pending.invoiceNumber)} —
-          ${som(pending.amount)} so'm. To'lov tasdiqlangach tarif faollashadi.
+          <strong>${esc(t('account.pendingPayment'))}</strong>
+          ${esc(t('account.pendingText', { invoice: pending.invoiceNumber, amount: som(pending.amount) }))}
         </div>` : ''}
-      ${data.plan === 'free' ? '<button type="button" class="btn btn-secondary" data-go="plans" style="margin-top:var(--s4)">Tariflarni ko\'rish</button>' : ''}`;
+      ${data.plan === 'free' ? `<button type="button" class="btn btn-secondary" data-go="plans" style="margin-top:var(--s4)">${esc(t('account.viewPlans'))}</button>` : ''}`;
   } catch {
     panel.innerHTML = '<p class="muted small">Tarif ma\'lumotini yuklab bo\'lmadi.</p>';
   }
@@ -771,12 +778,11 @@ async function renderTelegramPanel() {
     if (data.linked) {
       panel.innerHTML = `
         <div class="panel-head">
-          <h3>Telegram xabarnomasi</h3>
-          <span class="chip chip-verified">Ulangan</span>
+          <h3>${esc(t('account.telegram'))}</h3>
+          <span class="chip chip-verified">${esc(t('account.linked'))}</span>
         </div>
-        <p class="small muted">Yangi mos e'lonlar chiqqanda xabar beramiz.
-           Sozlamalarni botning o'zida o'zgartirasiz: <code>/sozlama</code></p>
-        <button type="button" class="btn btn-secondary btn-sm" id="tg-unlink" style="margin-top:var(--s3)">Uzish</button>`;
+        <p class="small muted">${esc(t('account.telegramText'))}</p>
+        <button type="button" class="btn btn-secondary btn-sm" id="tg-unlink" style="margin-top:var(--s3)">${esc(t('account.unlink'))}</button>`;
       $('#tg-unlink').addEventListener('click', unlinkTelegram);
       return;
     }
@@ -784,34 +790,34 @@ async function renderTelegramPanel() {
     if (!data.botUsername) {
       panel.innerHTML = `
         <div class="panel-head">
-          <h3>Telegram xabarnomasi</h3>
-          <span class="chip chip-neutral">Yoqilmagan</span>
+          <h3>${esc(t('account.telegram'))}</h3>
+          <span class="chip chip-neutral">${esc(t('account.telegramOff'))}</span>
         </div>
-        <p class="small muted">Bu funksiya hozircha ulanmagan.</p>`;
+        <p class="small muted">${esc(t('account.telegramOffText'))}</p>`;
       return;
     }
 
     panel.innerHTML = `
       <div class="panel-head">
-        <h3>Telegram xabarnomasi</h3>
-        <span class="chip chip-neutral">Ulanmagan</span>
+        <h3>${esc(t('account.telegram'))}</h3>
+        <span class="chip chip-neutral">${esc(t('account.notLinked'))}</span>
       </div>
-      <p class="small muted" style="margin-bottom:var(--s3)">Yangi e'lonlar haqida Telegram orqali xabar oling.</p>
+      <p class="small muted" style="margin-bottom:var(--s3)">${esc(t('account.telegramInvite'))}</p>
       <div style="display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap">
         <code class="num" style="font-size:17px;font-weight:600;letter-spacing:.12em;background:var(--paper-sunk);padding:8px 14px;border-radius:6px">${esc(data.code)}</code>
-        <a class="btn btn-primary" href="${esc(data.deepLink)}" target="_blank" rel="noopener noreferrer">Telegramda ochish</a>
+        <a class="btn btn-primary" href="${esc(data.deepLink)}" target="_blank" rel="noopener noreferrer">${esc(t('account.openTelegram'))}</a>
       </div>
-      <p class="small muted" style="margin-top:var(--s3)">Yoki botga yuboring: <code>/ulash ${esc(data.code)}</code></p>`;
+      <p class="small muted" style="margin-top:var(--s3)">${esc(t('account.orSend'))} <code>/ulash ${esc(data.code)}</code></p>`;
   } catch {
     panel.innerHTML = '<p class="muted small">Telegram ma\'lumotini yuklab bo\'lmadi.</p>';
   }
 }
 
 async function unlinkTelegram() {
-  if (!confirm('Telegram xabarnomasi uziladi. Davom etasizmi?')) return;
+  if (!confirm(t('account.unlinkConfirm'))) return;
   try {
     await apiJson('/api/auth/telegram-unlink', { method: 'POST', auth: true });
-    toast('Telegram uzildi');
+    toast(t('account.unlinked'));
     renderTelegramPanel();
   } catch (err) {
     toast(err.message, 'error');
@@ -831,7 +837,7 @@ $('#profile-form').addEventListener('submit', async (e) => {
     state.user = data.user;
     localStorage.setItem('tm_user', JSON.stringify(data.user));
     renderAuthState();
-    toast('Saqlandi', 'success');
+    toast(t('account.saved'), 'success');
   } catch (err) {
     toast(err.message, 'error');
   }
@@ -850,7 +856,7 @@ $('#password-form').addEventListener('submit', async (e) => {
       }),
     });
     e.target.reset();
-    toast('Parol o\'zgartirildi', 'success');
+    toast(t('account.passwordChanged'), 'success');
   } catch (err) {
     error.textContent = err.message;
   }
@@ -880,7 +886,7 @@ $('#doc-form').addEventListener('submit', async (e) => {
   const error = $('#doc-error');
   error.textContent = '';
   button.disabled = true;
-  button.innerHTML = '<span class="spinner"></span> Tayyorlanmoqda…';
+  button.innerHTML = `<span class="spinner"></span> ${esc(t('docs.generating'))}`;
 
   const body = Object.fromEntries(new FormData(e.target).entries());
 
@@ -894,7 +900,7 @@ $('#doc-form').addEventListener('submit', async (e) => {
     error.textContent = err.message;
   } finally {
     button.disabled = false;
-    button.textContent = '7 ta hujjatni tayyorlash';
+    button.textContent = t('docs.generate');
   }
 });
 
@@ -905,7 +911,7 @@ function renderDocs(docs, model) {
   box.innerHTML = `
     <div class="panel">
       <div class="panel-head">
-        <h3>Tayyor hujjatlar</h3>
+        <h3>${esc(t('docs.ready'))}</h3>
         <div style="display:flex;gap:var(--s2)">
           <button type="button" class="btn btn-secondary btn-sm" data-export="word">Word</button>
           <button type="button" class="btn btn-secondary btn-sm" data-export="pdf">PDF</button>
@@ -913,8 +919,7 @@ function renderDocs(docs, model) {
       </div>
 
       <div class="notice notice-caution" style="margin-bottom:var(--s4)">
-        <strong>Yuborishdan oldin tekshiring.</strong> Bu matnlar AI tomonidan
-        tayyorlangan. Raqamlar, sanalar va rekvizitlarni o'zingiz solishtiring.
+        <strong>${esc(t('docs.checkFirst'))}</strong> ${esc(t('docs.checkText'))}
       </div>
 
       <div class="tabs" role="tablist" id="doc-tabs">
@@ -933,7 +938,7 @@ function renderDocs(docs, model) {
 
 function showDoc(key) {
   $('#doc-text').value = generatedDocs?.[key] || '';
-  $$('#doc-tabs .tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.doc === key)));
+  $$('#doc-tabs .tab').forEach(el => el.setAttribute('aria-selected', String(el.dataset.doc === key)));
 }
 
 $('#doc-result').addEventListener('click', (e) => {
@@ -957,7 +962,7 @@ async function exportDocs(kind) {
   const company = $('#d-company').value.trim() || 'Kompaniya';
   const title = `TenderMind_${company}`.replace(/\s+/g, '_').slice(0, 100);
 
-  toast(`${kind.toUpperCase()} tayyorlanmoqda…`);
+  toast(t('docs.exporting', { format: kind.toUpperCase() }));
 
   try {
     const response = await api(`/api/export/${kind}`, {
@@ -967,7 +972,7 @@ async function exportDocs(kind) {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new ApiError(err.message || err.error || 'Eksport xatosi', response.status);
+      throw new ApiError(err.message || err.error || t('common.serverError'), response.status);
     }
 
     const blob = await response.blob();
@@ -979,7 +984,7 @@ async function exportDocs(kind) {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    toast('Yuklab olindi', 'success');
+    toast(t('docs.downloaded'), 'success');
   } catch (err) {
     toast(err.message, 'error');
   }
@@ -1004,7 +1009,7 @@ async function loadGuide() {
     renderGlossary(glossary.terms);
     guideLoaded = true;
   } catch (err) {
-    $('#steps').innerHTML = `<div class="empty"><h3>Yuklab bo'lmadi</h3><p>${esc(err.message)}</p></div>`;
+    $('#steps').innerHTML = `<div class="empty"><h3>${esc(t('guide.loadFail'))}</h3><p>${esc(err.message)}</p></div>`;
   }
 }
 
@@ -1019,7 +1024,7 @@ function renderSteps({ steps, progress }) {
       ${state.token ? `
         <button type="button" class="btn btn-secondary btn-sm" data-step="${esc(step.id)}"
                 ${done.has(step.id) ? 'disabled' : ''}>
-          ${done.has(step.id) ? 'Bajarildi' : 'Tushundim'}
+          ${esc(t(done.has(step.id) ? 'guide.done' : 'guide.understood'))}
         </button>` : ''}
     </article>`).join('');
 }
@@ -1035,19 +1040,19 @@ $('#steps').addEventListener('click', async (e) => {
     });
     btn.closest('.step').classList.add('is-done');
     btn.disabled = true;
-    btn.textContent = 'Bajarildi';
+    btn.textContent = t('guide.done');
   } catch (err) {
     toast(err.message, 'error');
   }
 });
 
 function renderGlossary(terms) {
-  $('#glossary-list').innerHTML = terms.map(t => `
+  $('#glossary-list').innerHTML = terms.map(entry => `
     <div class="panel" style="margin-bottom:var(--s3)">
-      <h3 style="font-size:var(--t-h3);font-weight:600;margin-bottom:var(--s2)">${esc(t.term)}</h3>
-      <p class="muted" style="margin-bottom:var(--s3)">${esc(t.short)}</p>
+      <h3 style="font-size:var(--t-h3);font-weight:600;margin-bottom:var(--s2)">${esc(entry.term)}</h3>
+      <p class="muted" style="margin-bottom:var(--s3)">${esc(entry.short)}</p>
       <p style="font-family:var(--font-read);font-size:var(--t-body);font-style:italic;color:var(--ink-2)">
-        ${esc(t.example)}
+        ${esc(entry.example)}
       </p>
     </div>`).join('');
 }
@@ -1076,7 +1081,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  const entry = state.glossary.find(t => t.term === trigger.dataset.term);
+  const entry = state.glossary.find(item => item.term === trigger.dataset.term);
   if (!entry) return;
 
   pop.innerHTML = `
@@ -1111,23 +1116,21 @@ async function loadPlans() {
       <div class="plan${plan.id === 'pro' ? ' is-featured' : ''}">
         <div class="plan-name">${esc(plan.name)}</div>
         <div class="plan-price">
-          <b>${som(plan.priceMonthly)}</b><span>so'm / oy</span>
+          <b>${som(plan.priceMonthly)}</b><span>${esc(t('plans.perMonth'))}</span>
         </div>
         <p class="plan-desc">${esc(plan.description)}</p>
         <ul class="plan-features">
           ${plan.features.map(f => `<li>${check}<span>${esc(f)}</span></li>`).join('')}
         </ul>
         ${plan.priceMonthly === 0
-          ? '<button type="button" class="btn btn-secondary" data-go="browse">Tenderlarni ko\'rish</button>'
-          : `<button type="button" class="btn btn-primary" data-subscribe="${esc(plan.id)}">Obuna bo'lish</button>`}
+          ? `<button type="button" class="btn btn-secondary" data-go="browse">${esc(t('plans.free'))}</button>`
+          : `<button type="button" class="btn btn-primary" data-subscribe="${esc(plan.id)}">${esc(t('plans.subscribe'))}</button>`}
       </div>`).join('');
 
     const automatic = data.paymentMethods.filter(m => m.automatic);
-    $('#plans-note').textContent = automatic.length
-      ? 'To\'lov onlayn amalga oshiriladi.'
-      : 'Hozircha to\'lov bank o\'tkazmasi orqali qabul qilinadi. Obuna bo\'lganingizda hisob-faktura beriladi; to\'lov tasdiqlangach tarif faollashadi.';
+    $('#plans-note').textContent = t(automatic.length ? 'plans.noteAuto' : 'plans.noteManual');
   } catch (err) {
-    $('#plans').innerHTML = `<div class="empty"><h3>Tariflarni yuklab bo'lmadi</h3><p>${esc(err.message)}</p></div>`;
+    $('#plans').innerHTML = `<div class="empty"><h3>${esc(t('plans.loadFail'))}</h3><p>${esc(err.message)}</p></div>`;
   }
 }
 
@@ -1139,7 +1142,7 @@ $('#plans').addEventListener('click', async (e) => {
 
   const plan = state.plans.find(p => p.id === btn.dataset.subscribe);
   const months = Number(prompt(
-    `${plan.name} tarifi — necha oyga?\n\n1 oy = ${som(plan.priceMonthly)} so'm\n12 oyga olsangiz 2 oy bepul.`,
+    t('plans.months', { plan: plan.name, price: som(plan.priceMonthly) }),
     '1'
   ));
   if (!months || months < 1) return;
@@ -1157,19 +1160,17 @@ $('#plans').addEventListener('click', async (e) => {
 
 function renderInvoice(data) {
   const inv = data.invoice;
-  openInfo('Hisob-faktura', `
-    ${data.alreadyPending ? '<div class="notice notice-caution" style="margin-bottom:var(--s4)">Sizda tasdiqlanmagan hisob-faktura bor. Yangisi yaratilmadi.</div>' : ''}
+  openInfo(t('plans.invoiceTitle'), `
+    ${data.alreadyPending ? `<div class="notice notice-caution" style="margin-bottom:var(--s4)">${esc(t('plans.invoicePending'))}</div>` : ''}
     <dl class="facts" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
-      <div><dt>Tarif</dt><dd>${esc(inv.planName || inv.plan)}</dd></div>
-      <div><dt>Summa</dt><dd>${som(inv.amount)} ${esc(inv.currency)}</dd></div>
-      <div><dt>Hisob-faktura</dt><dd>${esc(inv.invoiceNumber)}</dd></div>
+      <div><dt>${esc(t('plans.invoicePlan'))}</dt><dd>${esc(inv.planName || inv.plan)}</dd></div>
+      <div><dt>${esc(t('plans.invoiceAmount'))}</dt><dd>${som(inv.amount)} ${esc(inv.currency)}</dd></div>
+      <div><dt>${esc(t('plans.invoiceNumber'))}</dt><dd>${esc(inv.invoiceNumber)}</dd></div>
     </dl>
     <ol style="list-style:decimal;padding-left:20px;margin-top:var(--s4)">
       ${(data.instructions || []).map(s => `<li style="margin-bottom:6px;color:var(--ink-2)">${esc(s)}</li>`).join('')}
     </ol>
-    <p class="small muted" style="margin-top:var(--s4)">
-      Tarif to'lov tasdiqlangandan keyin faollashadi. Hozircha bepul tarif imkoniyatlaridan foydalanishingiz mumkin.
-    </p>`);
+    <p class="small muted" style="margin-top:var(--s4)">${esc(t('plans.invoiceNote'))}</p>`);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1177,12 +1178,7 @@ function renderInvoice(data) {
 // ═══════════════════════════════════════════════════════════════════
 const chat = { history: [], busy: false };
 
-const CHAT_SUGGESTIONS = [
-  'Tender nima va qanday ishlaydi?',
-  'Birinchi marta qatnashmoqchiman, nimadan boshlayman?',
-  'Qanday hujjatlar kerak?',
-  'Narxni qanday belgilash kerak?',
-];
+const CHAT_SUGGESTION_KEYS = ['chat.s1', 'chat.s2', 'chat.s3', 'chat.s4'];
 
 function toggleChat(open) {
   $('#chat').hidden = !open;
@@ -1202,12 +1198,10 @@ $('#chat-clear').addEventListener('click', () => {
 
 function renderChatIntro() {
   $('#chat-body').innerHTML = `
-    <div class="msg msg-bot">
-      Salom! Tender va davlat xaridlari bo'yicha savolingizga javob beraman.
-      Bilmagan narsangizni bemalol so'rang — sodda tilda tushuntiraman.
-    </div>
+    <div class="msg msg-bot">${esc(t('chat.intro'))}</div>
     <div class="chat-suggestions">
-      ${CHAT_SUGGESTIONS.map(s => `<button type="button" class="chat-suggestion">${esc(s)}</button>`).join('')}
+      ${CHAT_SUGGESTION_KEYS.map(key =>
+        `<button type="button" class="chat-suggestion">${esc(t(key))}</button>`).join('')}
     </div>`;
 }
 
@@ -1260,7 +1254,7 @@ $('#chat-form').addEventListener('submit', async (e) => {
     typing.remove();
 
     if (!response.ok) {
-      appendMessage('bot', data.message || data.error || 'Server xatosi');
+      appendMessage('bot', data.message || data.error || t('common.serverError'));
       return;
     }
 
@@ -1308,14 +1302,41 @@ async function loadStats() {
     // umumiy hisob endpointi yo'q — taxmin qilib yozish ma'lumotni
     // soxtalashtirish bo'lardi, shuning uchun u ko'rsatilmaydi.
     $('#stat-tenders').textContent = som(tenders.total);
-    $('#stat-sectors').textContent = String(Object.keys(SOHA).length);
-    $('#stat-regions').textContent = String(Object.keys(HUDUD).length);
+    $('#stat-sectors').textContent = String(sectorKeys().length);
+    $('#stat-regions').textContent = String(regionKeys().length);
   } catch {
     $('#search-stats').hidden = true;
   }
 }
 
+// ── Til almashtirish ────────────────────────────────────────────────
+function renderLangSwitch() {
+  $$('[data-lang]').forEach(btn =>
+    btn.setAttribute('aria-pressed', String(btn.dataset.lang === getLang())));
+}
+
+$$('[data-lang]').forEach(btn => {
+  btn.addEventListener('click', () => setLang(btn.dataset.lang));
+});
+
+// Til o'zgarganda faqat statik matn emas, JS chizgan hamma narsa ham
+// qayta chiziladi — aks holda ro'yxat va panellar eski tilda qolardi.
+onLangChange(() => {
+  renderLangSwitch();
+  renderSectorFilter();
+  renderResults();
+  renderPagination();
+  renderChatIntro();
+
+  if (state.view === 'work') loadWork();
+  if (state.view === 'account') loadAccount();
+  if (state.view === 'plans') { state.plans = []; loadPlans(); }
+  if (state.view === 'guide') { guideLoaded = false; loadGuide(); }
+});
+
 async function init() {
+  initLang();
+  renderLangSwitch();
   renderAuthState();
   renderSectorFilter();
 

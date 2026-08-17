@@ -1,0 +1,703 @@
+/* ═══════════════════════════════════════════════════════════════════
+   TENDERMIND — tarjimalar
+   ───────────────────────────────────────────────────────────────────
+   O'zbekiston biznesida rus tili keng ishlatiladi, shuning uchun RU
+   to'liq qo'llab-quvvatlanadi. EN — xalqaro yetkazib beruvchilar uchun.
+
+   Qoida: yangi matn HTML da `data-i18n` bilan belgilanadi yoki JS da
+   `t()` orqali olinadi. Kod ichida qo'lda yozilgan matn qolmasin —
+   aks holda til almashtirilganda u o'zbekcha bo'lib qolaveradi.
+   ═══════════════════════════════════════════════════════════════════ */
+
+'use strict';
+
+const DICT = {
+  uz: {
+    // Navigatsiya va yuqori panel
+    'nav.tenders': 'Tenderlar',
+    'nav.docs': 'Hujjatlar',
+    'nav.guide': "Qo'llanma",
+    'nav.plans': 'Narxlar',
+    'nav.work': 'Ishim',
+    'nav.signin': 'Kirish',
+    'nav.signout': 'Chiqish',
+    'nav.myWork': 'Mening ishim',
+    'nav.settings': 'Sozlamalar',
+    'nav.admin': 'Admin panel',
+    'nav.lang': 'Til',
+    'nav.skipToMain': "Asosiy mazmunga o'tish",
+
+    // Bosh ekran
+    'hero.title': 'Davlat xaridlarida qatnashish — <em>hammaga ochiq</em>',
+    'hero.sub': "E'lonlarni toping, har bir lotni oddiy tilda tushuning va hujjatlarni tayyorlang. Tender bilan ilk marta ishlayotgan bo'lsangiz ham.",
+    'hero.searchLabel': 'Nima izlayapsiz?',
+    'hero.searchPlaceholder': 'Nima izlayapsiz? Masalan: parta, kompyuter, ovqat',
+    'hero.searchButton': 'Qidirish',
+    'hero.statTenders': "ta faol e'lon",
+    'hero.statSectors': 'ta soha',
+    'hero.statRegions': 'ta hudud',
+    'hero.beginnerTitle': 'Birinchi marta?',
+    'hero.beginnerText': 'Qadamma-qadam boshlang — 10 daqiqa',
+
+    // Filtrlar
+    'filter.sector': 'Soha',
+    'filter.region': 'Hudud',
+    'filter.status': 'Holat',
+    'filter.allRegions': 'Barcha hududlar',
+    'filter.all': 'Barchasi',
+    'filter.statusActive': "Faol e'lonlar",
+    'filter.statusAll': 'Barchasi',
+    'filter.statusUrgent': 'Muddati yaqin',
+    'filter.reset': 'Filtrlarni tozalash',
+
+    // Natijalar
+    'results.sort': 'Saralash',
+    'results.sortNewest': "Yangi e'lonlar",
+    'results.sortDeadline': 'Muddati yaqin',
+    'results.sortBudget': 'Katta byudjet',
+    'results.loading': 'Yuklanmoqda…',
+    'results.found': "ta e'lon topildi",
+    'results.none': 'Hech narsa topilmadi',
+    'results.emptyTitle': "Bu shartlarga mos e'lon yo'q",
+    'results.emptyText': "Filtrlarni kengaytiring yoki boshqa so'z bilan qidiring.",
+    'results.failTitle': "Ro'yxatni yuklab bo'lmadi",
+    'results.retry': 'Qaytadan urinish',
+
+    // Qator
+    'row.deadline': 'Muddat',
+    'row.lots': 'Lot',
+    'row.som': "so'm",
+    'row.explain': 'Oddiy tilda tushuntirish',
+    'row.save': 'Saqlash',
+    'row.unsave': 'Saqlanganlardan olib tashlash',
+    'row.demo': 'DEMO',
+    'row.unverified': 'Tekshirilmagan',
+    'row.verified': 'Tasdiqlangan',
+    'row.more': 'Batafsil →',
+    'row.viewLots': "Lotlarni ko'rish →",
+    'row.noExplanation': "Bu e'lon uchun tushuntirish hali tayyorlanmagan.",
+
+    // Muddat
+    'time.expired': 'tugagan',
+    'time.today': 'bugun tugaydi',
+    'time.oneDay': '1 kun qoldi',
+    'time.days': '{n} kun qoldi',
+
+    // Kirish
+    'auth.signinTitle': 'Hisobingizga kiring',
+    'auth.registerTitle': 'Yangi hisob yarating',
+    'auth.tabLogin': 'Kirish',
+    'auth.tabRegister': "Ro'yxatdan o'tish",
+    'auth.phone': 'Telefon',
+    'auth.password': 'Parol',
+    'auth.name': 'Ism',
+    'auth.company': 'Kompaniya',
+    'auth.companyOptional': 'Ixtiyoriy',
+    'auth.welcome': 'Xush kelibsiz, {name}',
+    'auth.registered': "Hisob yaratildi. Qo'llanmadan boshlashni tavsiya qilamiz.",
+    'auth.signedOut': 'Hisobdan chiqdingiz',
+    'auth.needSignin': 'Bu amal uchun tizimga kiring',
+    'auth.expired': 'Sessiya tugadi. Qaytadan kiring.',
+
+    // Mening ishim
+    'work.title': 'Mening ishim',
+    'work.sub': 'Saqlagan lotlaringiz va yutgan tenderlaringiz.',
+    'work.saved': 'Saqlanganlar',
+    'work.won': 'Yutganlarim',
+    'work.compare': 'Ikkitasini solishtirish',
+    'work.savedEmptyTitle': "Hali hech narsa saqlamagansiz.",
+    'work.savedEmptyText': "Tenderlar ro'yxatida yoqqan e'lonni belgilab qo'ying — shu yerda to'planadi.",
+    'work.wonEmptyTitle': 'Hali yutgan tenderingiz belgilanmagan.',
+    'work.wonEmptyText': "Tenderni yutganingizda uni shu yerga qo'shing — statistikangiz to'planib boradi.",
+    'work.compareHint': "Solishtirish uchun ikkita e'lonni belgilang",
+    'work.compareLimit': 'Bir vaqtda ikkitasini solishtirish mumkin',
+    'work.compareLabel': 'solishtirish',
+    'work.comparing': 'Tahlil tayyorlanmoqda…',
+    'work.compareTitle': 'Solishtirish',
+    'work.adv1': 'Birinchisining afzalliklari',
+    'work.adv2': 'Ikkinchisining afzalliklari',
+    'work.recommendation': 'Tavsiya:',
+    'work.noAi': 'Bu tahlil AI siz, faqat raqamlar asosida tuzildi.',
+
+    // Sozlamalar
+    'account.title': 'Sozlamalar',
+    'account.plan': 'Tarif',
+    'account.docsToday': 'Bugungi hujjatlar',
+    'account.chatToday': 'Bugungi AI xabarlar',
+    'account.expires': 'Amal qilish muddati',
+    'account.viewPlans': "Tariflarni ko'rish",
+    'account.profile': 'Profil',
+    'account.save': 'Saqlash',
+    'account.saved': 'Saqlandi',
+    'account.changePassword': "Parolni o'zgartirish",
+    'account.currentPassword': 'Joriy parol',
+    'account.newPassword': 'Yangi parol',
+    'account.passwordChanged': "Parol o'zgartirildi",
+    'account.telegram': 'Telegram xabarnomasi',
+    'account.linked': 'Ulangan',
+    'account.notLinked': 'Ulanmagan',
+    'account.telegramOff': 'Yoqilmagan',
+    'account.telegramOffText': 'Bu funksiya hozircha ulanmagan.',
+    'account.telegramText': "Yangi mos e'lonlar chiqqanda xabar beramiz. Sozlamalarni botning o'zida o'zgartirasiz: /sozlama",
+    'account.telegramInvite': "Yangi e'lonlar haqida Telegram orqali xabar oling.",
+    'account.openTelegram': 'Telegramda ochish',
+    'account.orSend': 'Yoki botga yuboring:',
+    'account.unlink': 'Uzish',
+    'account.unlinkConfirm': 'Telegram xabarnomasi uziladi. Davom etasizmi?',
+    'account.unlinked': 'Telegram uzildi',
+    'account.pendingPayment': "To'lov kutilmoqda.",
+    'account.pendingText': "Hisob-faktura {invoice} — {amount} so'm. To'lov tasdiqlangach tarif faollashadi.",
+
+    // Hujjatlar
+    'docs.title': 'Hujjatlarni tayyorlash',
+    'docs.sub': "Kompaniya va lot ma'lumotlarini kiriting — tender uchun kerak bo'ladigan 7 ta shakl tayyorlanadi. Yuborishdan oldin har birini o'zingiz tekshiring.",
+    'docs.companySection': 'Kompaniya',
+    'docs.lotSection': 'Lot',
+    'docs.companyName': 'Kompaniya nomi',
+    'docs.orgForm': 'Tashkiliy shakl',
+    'docs.director': 'Rahbar',
+    'docs.inn': 'STIR (INN)',
+    'docs.experience': 'Tajriba (yil)',
+    'docs.contact': 'Aloqa',
+    'docs.address': 'Manzil',
+    'docs.pastProjects': 'Avvalgi loyihalar',
+    'docs.pastProjectsHint': 'Qisqacha: qayerda, nima qilgansiz, qachon',
+    'docs.lotName': 'Lot yoki tender nomi',
+    'docs.lotNumber': 'Lot raqami',
+    'docs.buyer': 'Buyurtmachi',
+    'docs.price': "Taklif narxi (so'm)",
+    'docs.deliveryTerm': 'Bajarish muddati',
+    'docs.generate': '7 ta hujjatni tayyorlash',
+    'docs.generating': 'Tayyorlanmoqda…',
+    'docs.ready': 'Tayyor hujjatlar',
+    'docs.checkFirst': 'Yuborishdan oldin tekshiring.',
+    'docs.checkText': "Bu matnlar AI tomonidan tayyorlangan. Raqamlar, sanalar va rekvizitlarni o'zingiz solishtiring.",
+    'docs.exporting': '{format} tayyorlanmoqda…',
+    'docs.downloaded': 'Yuklab olindi',
+
+    // Qo'llanma
+    'guide.title': 'Birinchi tenderingiz',
+    'guide.sub': 'Tender haqida hech narsa bilmasangiz ham — shu yerdan boshlang. Har bir qadam bitta savolga javob beradi.',
+    'guide.understood': 'Tushundim',
+    'guide.done': 'Bajarildi',
+    'guide.termsTitle': 'Atamalar',
+    'guide.termsSub': "Notanish so'zga duch kelsangiz — shu yerdan qarang.",
+    'guide.loadFail': "Yuklab bo'lmadi",
+
+    // Tariflar
+    'plans.title': 'Tariflar',
+    'plans.sub': "Tenderlarni ko'rish va lotlarni tushunish — har doim bepul. Pullik tarif faqat AI hujjat va maslahat limitini kengaytiradi.",
+    'plans.perMonth': "so'm / oy",
+    'plans.free': "Tenderlarni ko'rish",
+    'plans.subscribe': "Obuna bo'lish",
+    'plans.months': "{plan} tarifi — necha oyga?\n\n1 oy = {price} so'm\n12 oyga olsangiz 2 oy bepul.",
+    'plans.noteManual': "Hozircha to'lov bank o'tkazmasi orqali qabul qilinadi. Obuna bo'lganingizda hisob-faktura beriladi; to'lov tasdiqlangach tarif faollashadi.",
+    'plans.noteAuto': "To'lov onlayn amalga oshiriladi.",
+    'plans.loadFail': "Tariflarni yuklab bo'lmadi",
+    'plans.invoiceTitle': 'Hisob-faktura',
+    'plans.invoicePlan': 'Tarif',
+    'plans.invoiceAmount': 'Summa',
+    'plans.invoiceNumber': 'Hisob-faktura',
+    'plans.invoicePending': "Sizda tasdiqlanmagan hisob-faktura bor. Yangisi yaratilmadi.",
+    'plans.invoiceNote': "Tarif to'lov tasdiqlangandan keyin faollashadi. Hozircha bepul tarif imkoniyatlaridan foydalanishingiz mumkin.",
+
+    // Chat
+    'chat.open': 'Savolingiz bormi?',
+    'chat.title': 'AI maslahatchi',
+    'chat.clear': 'Suhbatni tozalash',
+    'chat.close': 'Yopish',
+    'chat.send': 'Yuborish',
+    'chat.placeholder': 'Savolingizni yozing…',
+    'chat.yourQuestion': 'Savolingiz',
+    'chat.intro': "Salom! Tender va davlat xaridlari bo'yicha savolingizga javob beraman. Bilmagan narsangizni bemalol so'rang — sodda tilda tushuntiraman.",
+    'chat.s1': 'Tender nima va qanday ishlaydi?',
+    'chat.s2': 'Birinchi marta qatnashmoqchiman, nimadan boshlayman?',
+    'chat.s3': 'Qanday hujjatlar kerak?',
+    'chat.s4': 'Narxni qanday belgilash kerak?',
+
+    // Umumiy
+    'common.close': 'Yopish',
+    'common.serverError': 'Server xatosi',
+    'common.offline': "Serverga ulanib bo'lmadi. Internetni tekshiring.",
+    'common.footerNote': 'AI tayyorlagan matnlar insoniy tekshiruvni talab qiladi.',
+    'common.required': '*',
+  },
+
+  ru: {
+    'nav.tenders': 'Тендеры',
+    'nav.docs': 'Документы',
+    'nav.guide': 'Руководство',
+    'nav.plans': 'Тарифы',
+    'nav.work': 'Мои',
+    'nav.signin': 'Войти',
+    'nav.signout': 'Выйти',
+    'nav.myWork': 'Мои тендеры',
+    'nav.settings': 'Настройки',
+    'nav.admin': 'Админ-панель',
+    'nav.lang': 'Язык',
+    'nav.skipToMain': 'Перейти к содержимому',
+
+    'hero.title': 'Участие в госзакупках — <em>открыто для всех</em>',
+    'hero.sub': 'Найдите объявления, поймите каждый лот простыми словами и подготовьте документы. Даже если вы участвуете впервые.',
+    'hero.searchLabel': 'Что вы ищете?',
+    'hero.searchPlaceholder': 'Что вы ищете? Например: парта, компьютер, питание',
+    'hero.searchButton': 'Найти',
+    'hero.statTenders': 'активных объявлений',
+    'hero.statSectors': 'отраслей',
+    'hero.statRegions': 'регионов',
+    'hero.beginnerTitle': 'Впервые здесь?',
+    'hero.beginnerText': 'Начните пошагово — 10 минут',
+
+    'filter.sector': 'Отрасль',
+    'filter.region': 'Регион',
+    'filter.status': 'Статус',
+    'filter.allRegions': 'Все регионы',
+    'filter.all': 'Все',
+    'filter.statusActive': 'Активные',
+    'filter.statusAll': 'Все',
+    'filter.statusUrgent': 'Скоро закрытие',
+    'filter.reset': 'Сбросить фильтры',
+
+    'results.sort': 'Сортировка',
+    'results.sortNewest': 'Новые',
+    'results.sortDeadline': 'Скоро закрытие',
+    'results.sortBudget': 'Крупный бюджет',
+    'results.loading': 'Загрузка…',
+    'results.found': 'объявлений найдено',
+    'results.none': 'Ничего не найдено',
+    'results.emptyTitle': 'Нет объявлений по этим условиям',
+    'results.emptyText': 'Расширьте фильтры или попробуйте другой запрос.',
+    'results.failTitle': 'Не удалось загрузить список',
+    'results.retry': 'Повторить',
+
+    'row.deadline': 'Срок',
+    'row.lots': 'Лотов',
+    'row.som': 'сум',
+    'row.explain': 'Объяснить простыми словами',
+    'row.save': 'Сохранить',
+    'row.unsave': 'Убрать из сохранённых',
+    'row.demo': 'ДЕМО',
+    'row.unverified': 'Не проверено',
+    'row.verified': 'Проверено',
+    'row.more': 'Подробнее →',
+    'row.viewLots': 'Посмотреть лоты →',
+    'row.noExplanation': 'Объяснение для этого объявления ещё не подготовлено.',
+
+    'time.expired': 'истёк',
+    'time.today': 'истекает сегодня',
+    'time.oneDay': 'остался 1 день',
+    'time.days': 'осталось {n} дн.',
+
+    'auth.signinTitle': 'Вход в аккаунт',
+    'auth.registerTitle': 'Создание аккаунта',
+    'auth.tabLogin': 'Вход',
+    'auth.tabRegister': 'Регистрация',
+    'auth.phone': 'Телефон',
+    'auth.password': 'Пароль',
+    'auth.name': 'Имя',
+    'auth.company': 'Компания',
+    'auth.companyOptional': 'Необязательно',
+    'auth.welcome': 'Добро пожаловать, {name}',
+    'auth.registered': 'Аккаунт создан. Рекомендуем начать с руководства.',
+    'auth.signedOut': 'Вы вышли из аккаунта',
+    'auth.needSignin': 'Для этого действия войдите в аккаунт',
+    'auth.expired': 'Сессия истекла. Войдите заново.',
+
+    'work.title': 'Мои тендеры',
+    'work.sub': 'Сохранённые лоты и выигранные тендеры.',
+    'work.saved': 'Сохранённые',
+    'work.won': 'Выигранные',
+    'work.compare': 'Сравнить два',
+    'work.savedEmptyTitle': 'Вы пока ничего не сохранили.',
+    'work.savedEmptyText': 'Отметьте подходящее объявление в списке — оно появится здесь.',
+    'work.wonEmptyTitle': 'Выигранные тендеры пока не отмечены.',
+    'work.wonEmptyText': 'Отмечайте выигранные тендеры — так накопится ваша статистика.',
+    'work.compareHint': 'Отметьте два объявления для сравнения',
+    'work.compareLimit': 'Сравнивать можно только два объявления',
+    'work.compareLabel': 'сравнить',
+    'work.comparing': 'Готовим анализ…',
+    'work.compareTitle': 'Сравнение',
+    'work.adv1': 'Преимущества первого',
+    'work.adv2': 'Преимущества второго',
+    'work.recommendation': 'Рекомендация:',
+    'work.noAi': 'Этот анализ составлен без ИИ, только по цифрам.',
+
+    'account.title': 'Настройки',
+    'account.plan': 'Тариф',
+    'account.docsToday': 'Документов сегодня',
+    'account.chatToday': 'Сообщений ИИ сегодня',
+    'account.expires': 'Действует до',
+    'account.viewPlans': 'Посмотреть тарифы',
+    'account.profile': 'Профиль',
+    'account.save': 'Сохранить',
+    'account.saved': 'Сохранено',
+    'account.changePassword': 'Смена пароля',
+    'account.currentPassword': 'Текущий пароль',
+    'account.newPassword': 'Новый пароль',
+    'account.passwordChanged': 'Пароль изменён',
+    'account.telegram': 'Уведомления в Telegram',
+    'account.linked': 'Подключено',
+    'account.notLinked': 'Не подключено',
+    'account.telegramOff': 'Отключено',
+    'account.telegramOffText': 'Эта функция пока не подключена.',
+    'account.telegramText': 'Сообщим о новых подходящих объявлениях. Настройки меняются в самом боте: /sozlama',
+    'account.telegramInvite': 'Получайте уведомления о новых объявлениях в Telegram.',
+    'account.openTelegram': 'Открыть в Telegram',
+    'account.orSend': 'Или отправьте боту:',
+    'account.unlink': 'Отключить',
+    'account.unlinkConfirm': 'Уведомления в Telegram будут отключены. Продолжить?',
+    'account.unlinked': 'Telegram отключён',
+    'account.pendingPayment': 'Ожидается оплата.',
+    'account.pendingText': 'Счёт {invoice} — {amount} сум. Тариф активируется после подтверждения оплаты.',
+
+    'docs.title': 'Подготовка документов',
+    'docs.sub': 'Заполните данные компании и лота — будут подготовлены 7 форм для тендера. Перед отправкой проверьте каждую самостоятельно.',
+    'docs.companySection': 'Компания',
+    'docs.lotSection': 'Лот',
+    'docs.companyName': 'Название компании',
+    'docs.orgForm': 'Организационная форма',
+    'docs.director': 'Руководитель',
+    'docs.inn': 'ИНН',
+    'docs.experience': 'Опыт (лет)',
+    'docs.contact': 'Контакты',
+    'docs.address': 'Адрес',
+    'docs.pastProjects': 'Предыдущие проекты',
+    'docs.pastProjectsHint': 'Коротко: где, что делали, когда',
+    'docs.lotName': 'Название лота или тендера',
+    'docs.lotNumber': 'Номер лота',
+    'docs.buyer': 'Заказчик',
+    'docs.price': 'Цена предложения (сум)',
+    'docs.deliveryTerm': 'Срок исполнения',
+    'docs.generate': 'Подготовить 7 документов',
+    'docs.generating': 'Готовим…',
+    'docs.ready': 'Готовые документы',
+    'docs.checkFirst': 'Проверьте перед отправкой.',
+    'docs.checkText': 'Эти тексты подготовлены ИИ. Сверьте цифры, даты и реквизиты самостоятельно.',
+    'docs.exporting': 'Готовим {format}…',
+    'docs.downloaded': 'Скачано',
+
+    'guide.title': 'Ваш первый тендер',
+    'guide.sub': 'Даже если вы ничего не знаете о тендерах — начните отсюда. Каждый шаг отвечает на один вопрос.',
+    'guide.understood': 'Понятно',
+    'guide.done': 'Пройдено',
+    'guide.termsTitle': 'Термины',
+    'guide.termsSub': 'Встретили незнакомое слово — посмотрите здесь.',
+    'guide.loadFail': 'Не удалось загрузить',
+
+    'plans.title': 'Тарифы',
+    'plans.sub': 'Просмотр тендеров и объяснение лотов — всегда бесплатно. Платный тариф только расширяет лимиты ИИ.',
+    'plans.perMonth': 'сум / мес',
+    'plans.free': 'Смотреть тендеры',
+    'plans.subscribe': 'Оформить',
+    'plans.months': 'Тариф {plan} — на сколько месяцев?\n\n1 месяц = {price} сум\nПри оплате за 12 месяцев 2 месяца бесплатно.',
+    'plans.noteManual': 'Пока оплата принимается банковским переводом. При оформлении выдаётся счёт; тариф активируется после подтверждения оплаты.',
+    'plans.noteAuto': 'Оплата проходит онлайн.',
+    'plans.loadFail': 'Не удалось загрузить тарифы',
+    'plans.invoiceTitle': 'Счёт',
+    'plans.invoicePlan': 'Тариф',
+    'plans.invoiceAmount': 'Сумма',
+    'plans.invoiceNumber': 'Номер счёта',
+    'plans.invoicePending': 'У вас есть неоплаченный счёт. Новый не создан.',
+    'plans.invoiceNote': 'Тариф активируется после подтверждения оплаты. Пока доступны возможности бесплатного тарифа.',
+
+    'chat.open': 'Есть вопрос?',
+    'chat.title': 'ИИ-консультант',
+    'chat.clear': 'Очистить диалог',
+    'chat.close': 'Закрыть',
+    'chat.send': 'Отправить',
+    'chat.placeholder': 'Напишите вопрос…',
+    'chat.yourQuestion': 'Ваш вопрос',
+    'chat.intro': 'Здравствуйте! Отвечу на вопросы о тендерах и госзакупках. Спрашивайте что угодно — объясню простыми словами.',
+    'chat.s1': 'Что такое тендер и как он работает?',
+    'chat.s2': 'Участвую впервые, с чего начать?',
+    'chat.s3': 'Какие документы нужны?',
+    'chat.s4': 'Как определить цену?',
+
+    'common.close': 'Закрыть',
+    'common.serverError': 'Ошибка сервера',
+    'common.offline': 'Не удалось связаться с сервером. Проверьте интернет.',
+    'common.footerNote': 'Тексты, подготовленные ИИ, требуют проверки человеком.',
+    'common.required': '*',
+  },
+
+  en: {
+    'nav.tenders': 'Tenders',
+    'nav.docs': 'Documents',
+    'nav.guide': 'Guide',
+    'nav.plans': 'Pricing',
+    'nav.work': 'Mine',
+    'nav.signin': 'Sign in',
+    'nav.signout': 'Sign out',
+    'nav.myWork': 'My tenders',
+    'nav.settings': 'Settings',
+    'nav.admin': 'Admin panel',
+    'nav.lang': 'Language',
+    'nav.skipToMain': 'Skip to content',
+
+    'hero.title': 'Public procurement — <em>open to everyone</em>',
+    'hero.sub': 'Find notices, understand every lot in plain language, and prepare your documents. Even if this is your first tender.',
+    'hero.searchLabel': 'What are you looking for?',
+    'hero.searchPlaceholder': 'What are you looking for? For example: desks, computers, catering',
+    'hero.searchButton': 'Search',
+    'hero.statTenders': 'active notices',
+    'hero.statSectors': 'sectors',
+    'hero.statRegions': 'regions',
+    'hero.beginnerTitle': 'First time?',
+    'hero.beginnerText': 'Start step by step — 10 minutes',
+
+    'filter.sector': 'Sector',
+    'filter.region': 'Region',
+    'filter.status': 'Status',
+    'filter.allRegions': 'All regions',
+    'filter.all': 'All',
+    'filter.statusActive': 'Active',
+    'filter.statusAll': 'All',
+    'filter.statusUrgent': 'Closing soon',
+    'filter.reset': 'Clear filters',
+
+    'results.sort': 'Sort',
+    'results.sortNewest': 'Newest',
+    'results.sortDeadline': 'Closing soon',
+    'results.sortBudget': 'Largest budget',
+    'results.loading': 'Loading…',
+    'results.found': 'notices found',
+    'results.none': 'Nothing found',
+    'results.emptyTitle': 'No notices match these filters',
+    'results.emptyText': 'Widen the filters or try a different search.',
+    'results.failTitle': 'Could not load the list',
+    'results.retry': 'Try again',
+
+    'row.deadline': 'Deadline',
+    'row.lots': 'Lots',
+    'row.som': 'UZS',
+    'row.explain': 'Explain in plain language',
+    'row.save': 'Save',
+    'row.unsave': 'Remove from saved',
+    'row.demo': 'DEMO',
+    'row.unverified': 'Unverified',
+    'row.verified': 'Verified',
+    'row.more': 'Details →',
+    'row.viewLots': 'View lots →',
+    'row.noExplanation': 'No plain-language explanation has been prepared for this notice yet.',
+
+    'time.expired': 'closed',
+    'time.today': 'closes today',
+    'time.oneDay': '1 day left',
+    'time.days': '{n} days left',
+
+    'auth.signinTitle': 'Sign in',
+    'auth.registerTitle': 'Create an account',
+    'auth.tabLogin': 'Sign in',
+    'auth.tabRegister': 'Register',
+    'auth.phone': 'Phone',
+    'auth.password': 'Password',
+    'auth.name': 'Name',
+    'auth.company': 'Company',
+    'auth.companyOptional': 'Optional',
+    'auth.welcome': 'Welcome, {name}',
+    'auth.registered': 'Account created. We suggest starting with the guide.',
+    'auth.signedOut': 'Signed out',
+    'auth.needSignin': 'Sign in to do this',
+    'auth.expired': 'Session expired. Please sign in again.',
+
+    'work.title': 'My tenders',
+    'work.sub': 'Lots you saved and tenders you won.',
+    'work.saved': 'Saved',
+    'work.won': 'Won',
+    'work.compare': 'Compare two',
+    'work.savedEmptyTitle': 'You have not saved anything yet.',
+    'work.savedEmptyText': 'Mark a notice in the list and it will collect here.',
+    'work.wonEmptyTitle': 'No won tenders marked yet.',
+    'work.wonEmptyText': 'Mark the tenders you win and your record builds up here.',
+    'work.compareHint': 'Select two notices to compare',
+    'work.compareLimit': 'You can compare two notices at a time',
+    'work.compareLabel': 'compare',
+    'work.comparing': 'Preparing the analysis…',
+    'work.compareTitle': 'Comparison',
+    'work.adv1': 'Strengths of the first',
+    'work.adv2': 'Strengths of the second',
+    'work.recommendation': 'Recommendation:',
+    'work.noAi': 'This comparison was built from the figures alone, without AI.',
+
+    'account.title': 'Settings',
+    'account.plan': 'Plan',
+    'account.docsToday': 'Documents today',
+    'account.chatToday': 'AI messages today',
+    'account.expires': 'Valid until',
+    'account.viewPlans': 'View plans',
+    'account.profile': 'Profile',
+    'account.save': 'Save',
+    'account.saved': 'Saved',
+    'account.changePassword': 'Change password',
+    'account.currentPassword': 'Current password',
+    'account.newPassword': 'New password',
+    'account.passwordChanged': 'Password changed',
+    'account.telegram': 'Telegram alerts',
+    'account.linked': 'Connected',
+    'account.notLinked': 'Not connected',
+    'account.telegramOff': 'Disabled',
+    'account.telegramOffText': 'This feature is not connected yet.',
+    'account.telegramText': 'We will notify you about new matching notices. Change settings in the bot itself: /sozlama',
+    'account.telegramInvite': 'Get alerts about new notices in Telegram.',
+    'account.openTelegram': 'Open in Telegram',
+    'account.orSend': 'Or send the bot:',
+    'account.unlink': 'Disconnect',
+    'account.unlinkConfirm': 'Telegram alerts will be disconnected. Continue?',
+    'account.unlinked': 'Telegram disconnected',
+    'account.pendingPayment': 'Payment pending.',
+    'account.pendingText': 'Invoice {invoice} — {amount} UZS. The plan activates once payment is confirmed.',
+
+    'docs.title': 'Prepare documents',
+    'docs.sub': 'Enter your company and lot details — seven tender forms will be prepared. Check each one yourself before submitting.',
+    'docs.companySection': 'Company',
+    'docs.lotSection': 'Lot',
+    'docs.companyName': 'Company name',
+    'docs.orgForm': 'Legal form',
+    'docs.director': 'Director',
+    'docs.inn': 'Tax ID',
+    'docs.experience': 'Experience (years)',
+    'docs.contact': 'Contact',
+    'docs.address': 'Address',
+    'docs.pastProjects': 'Past projects',
+    'docs.pastProjectsHint': 'Briefly: where, what you did, when',
+    'docs.lotName': 'Lot or tender name',
+    'docs.lotNumber': 'Lot number',
+    'docs.buyer': 'Buyer',
+    'docs.price': 'Your price (UZS)',
+    'docs.deliveryTerm': 'Delivery term',
+    'docs.generate': 'Prepare 7 documents',
+    'docs.generating': 'Preparing…',
+    'docs.ready': 'Prepared documents',
+    'docs.checkFirst': 'Check before submitting.',
+    'docs.checkText': 'These texts were prepared by AI. Verify the figures, dates and details yourself.',
+    'docs.exporting': 'Preparing {format}…',
+    'docs.downloaded': 'Downloaded',
+
+    'guide.title': 'Your first tender',
+    'guide.sub': 'Even if you know nothing about tenders, start here. Each step answers one question.',
+    'guide.understood': 'Got it',
+    'guide.done': 'Done',
+    'guide.termsTitle': 'Glossary',
+    'guide.termsSub': 'Come across a word you do not know? Look it up here.',
+    'guide.loadFail': 'Could not load',
+
+    'plans.title': 'Pricing',
+    'plans.sub': 'Browsing tenders and understanding lots is always free. A paid plan only raises the AI limits.',
+    'plans.perMonth': 'UZS / month',
+    'plans.free': 'Browse tenders',
+    'plans.subscribe': 'Subscribe',
+    'plans.months': '{plan} plan — how many months?\n\n1 month = {price} UZS\nPay for 12 months and 2 are free.',
+    'plans.noteManual': 'Payment is currently accepted by bank transfer. You receive an invoice when subscribing; the plan activates once payment is confirmed.',
+    'plans.noteAuto': 'Payment is handled online.',
+    'plans.loadFail': 'Could not load plans',
+    'plans.invoiceTitle': 'Invoice',
+    'plans.invoicePlan': 'Plan',
+    'plans.invoiceAmount': 'Amount',
+    'plans.invoiceNumber': 'Invoice number',
+    'plans.invoicePending': 'You already have an unpaid invoice. A new one was not created.',
+    'plans.invoiceNote': 'The plan activates once payment is confirmed. Free plan features remain available meanwhile.',
+
+    'chat.open': 'Have a question?',
+    'chat.title': 'AI assistant',
+    'chat.clear': 'Clear conversation',
+    'chat.close': 'Close',
+    'chat.send': 'Send',
+    'chat.placeholder': 'Type your question…',
+    'chat.yourQuestion': 'Your question',
+    'chat.intro': 'Hello. I answer questions about tenders and public procurement. Ask anything — I explain in plain language.',
+    'chat.s1': 'What is a tender and how does it work?',
+    'chat.s2': 'This is my first time — where do I start?',
+    'chat.s3': 'Which documents do I need?',
+    'chat.s4': 'How do I set my price?',
+
+    'common.close': 'Close',
+    'common.serverError': 'Server error',
+    'common.offline': 'Could not reach the server. Check your connection.',
+    'common.footerNote': 'Texts prepared by AI require human review.',
+    'common.required': '*',
+  },
+};
+
+/** Soha nomlari — kod qiymati har doim bir xil, faqat ko'rsatiladigan nomi o'zgaradi */
+const SECTORS = {
+  uz: { it: 'IT', qurilish: 'Qurilish', tibbiyot: 'Tibbiyot', oziq: 'Oziq-ovqat', transport: 'Transport', talim: "Ta'lim", ekologiya: 'Ekologiya', qishloq: "Qishloq xo'jaligi", boshqa: 'Boshqa' },
+  ru: { it: 'ИТ', qurilish: 'Строительство', tibbiyot: 'Медицина', oziq: 'Продукты питания', transport: 'Транспорт', talim: 'Образование', ekologiya: 'Экология', qishloq: 'Сельское хозяйство', boshqa: 'Прочее' },
+  en: { it: 'IT', qurilish: 'Construction', tibbiyot: 'Healthcare', oziq: 'Food', transport: 'Transport', talim: 'Education', ekologiya: 'Environment', qishloq: 'Agriculture', boshqa: 'Other' },
+};
+
+const REGIONS = {
+  uz: { toshkent: 'Toshkent', samarqand: 'Samarqand', buxoro: 'Buxoro', andijon: 'Andijon', namangan: 'Namangan', fargona: "Farg'ona", qashqadaryo: 'Qashqadaryo', surxondaryo: 'Surxondaryo', xorazm: 'Xorazm', navoiy: 'Navoiy', jizzax: 'Jizzax', sirdaryo: 'Sirdaryo', qoraqalpogiston: "Qoraqalpog'iston", boshqa: 'Boshqa' },
+  ru: { toshkent: 'Ташкент', samarqand: 'Самарканд', buxoro: 'Бухара', andijon: 'Андижан', namangan: 'Наманган', fargona: 'Фергана', qashqadaryo: 'Кашкадарья', surxondaryo: 'Сурхандарья', xorazm: 'Хорезм', navoiy: 'Навои', jizzax: 'Джизак', sirdaryo: 'Сырдарья', qoraqalpogiston: 'Каракалпакстан', boshqa: 'Прочее' },
+  en: { toshkent: 'Tashkent', samarqand: 'Samarkand', buxoro: 'Bukhara', andijon: 'Andijan', namangan: 'Namangan', fargona: 'Fergana', qashqadaryo: 'Qashqadaryo', surxondaryo: 'Surxondaryo', xorazm: 'Khorezm', navoiy: 'Navoiy', jizzax: 'Jizzakh', sirdaryo: 'Sirdaryo', qoraqalpogiston: 'Karakalpakstan', boshqa: 'Other' },
+};
+
+export const LANGS = ['uz', 'ru', 'en'];
+const DEFAULT_LANG = 'uz';
+
+let current = DEFAULT_LANG;
+
+/**
+ * Faqat foydalanuvchi o'zi tanlagan til hisobga olinadi.
+ *
+ * Brauzer tili bo'yicha avtomatik tanlash ataylab qilinmagan: e'lon
+ * sarlavhalari, tashkilot nomlari va lot tavsiflari bazada o'zbekcha —
+ * interfeysni inglizchaga o'girish ularni tarjima qilmaydi va natijada
+ * aralash, chalkash sahifa chiqadi. Til tugmasi yuqorida turibdi.
+ */
+function detectLang() {
+  const saved = localStorage.getItem('tm_lang');
+  return LANGS.includes(saved) ? saved : DEFAULT_LANG;
+}
+
+/**
+ * Tarjimani olish. Kalit topilmasa o'zbekchaga, u ham bo'lmasa
+ * kalitning o'ziga qaytadi — matn hech qachon bo'sh chiqmaydi.
+ */
+export function t(key, vars) {
+  const value = DICT[current]?.[key] ?? DICT[DEFAULT_LANG][key] ?? key;
+  if (!vars) return value;
+
+  return value.replace(/\{(\w+)\}/g, (match, name) =>
+    Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : match);
+}
+
+export const getLang = () => current;
+export const sectorName = (key) => SECTORS[current]?.[key] || SECTORS[DEFAULT_LANG][key] || key;
+export const regionName = (key) => REGIONS[current]?.[key] || REGIONS[DEFAULT_LANG][key] || key;
+export const sectorKeys = () => Object.keys(SECTORS[DEFAULT_LANG]);
+export const regionKeys = () => Object.keys(REGIONS[DEFAULT_LANG]);
+
+/** HTML dagi `data-i18n` belgilangan elementlarni to'ldirish */
+export function applyStatic(root = document) {
+  root.querySelectorAll('[data-i18n]').forEach(el => {
+    el.innerHTML = t(el.dataset.i18n);
+  });
+  root.querySelectorAll('[data-i18n-attr]').forEach(el => {
+    // Format: "placeholder:hero.searchPlaceholder, title:common.close"
+    for (const pair of el.dataset.i18nAttr.split(',')) {
+      const [attr, key] = pair.split(':').map(s => s.trim());
+      if (attr && key) el.setAttribute(attr, t(key));
+    }
+  });
+}
+
+const listeners = new Set();
+export const onLangChange = (fn) => listeners.add(fn);
+
+export function setLang(lang) {
+  if (!LANGS.includes(lang) || lang === current) return;
+
+  current = lang;
+  localStorage.setItem('tm_lang', lang);
+  document.documentElement.lang = lang;
+
+  applyStatic();
+  listeners.forEach(fn => fn(lang));
+}
+
+export function initLang() {
+  current = detectLang();
+  document.documentElement.lang = current;
+  applyStatic();
+  return current;
+}

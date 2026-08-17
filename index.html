@@ -17,7 +17,7 @@
 </head>
 <body>
 
-<a href="#main" class="visually-hidden">Asosiy mazmunga o'tish</a>
+<a href="#main" class="visually-hidden" data-i18n="nav.skipToMain">Asosiy mazmunga o'tish</a>
 
 <!-- ══ Yuqori panel ══════════════════════════════════════════════ -->
 <header class="topbar">
@@ -30,20 +30,20 @@
   </a>
 
   <nav class="topnav" aria-label="Asosiy">
-    <a href="#" class="topnav-link" data-go="browse" aria-current="page">Tenderlar</a>
-    <a href="#" class="topnav-link" data-go="docs">Hujjatlar</a>
-    <a href="#" class="topnav-link" data-go="guide">Qo'llanma</a>
-    <a href="#" class="topnav-link" data-go="plans">Narxlar</a>
+    <a href="#" class="topnav-link" data-go="browse" aria-current="page" data-i18n="nav.tenders">Tenderlar</a>
+    <a href="#" class="topnav-link" data-go="docs" data-i18n="nav.docs">Hujjatlar</a>
+    <a href="#" class="topnav-link" data-go="guide" data-i18n="nav.guide">Qo'llanma</a>
+    <a href="#" class="topnav-link" data-go="plans" data-i18n="nav.plans">Narxlar</a>
   </nav>
 
   <div class="topbar-end">
-    <div class="lang-switch" role="group" aria-label="Til">
+    <div class="lang-switch" role="group" data-i18n-attr="aria-label:nav.lang" aria-label="Til">
       <button type="button" data-lang="uz" aria-pressed="true">UZ</button>
       <button type="button" data-lang="ru" aria-pressed="false">RU</button>
       <button type="button" data-lang="en" aria-pressed="false">EN</button>
     </div>
 
-    <button type="button" class="btn btn-secondary btn-sm" id="signin-btn">Kirish</button>
+    <button type="button" class="btn btn-secondary btn-sm" id="signin-btn" data-i18n="nav.signin">Kirish</button>
 
     <div class="account" id="account" hidden>
       <button type="button" class="account-btn" id="account-btn" aria-expanded="false" aria-haspopup="true">
@@ -55,10 +55,10 @@
           <div class="account-menu-name" id="menu-name">—</div>
           <div class="account-menu-plan" id="menu-plan">—</div>
         </div>
-        <a href="#" data-go="work">Mening ishim</a>
-        <a href="#" data-go="account">Sozlamalar</a>
-        <a href="/admin" id="menu-admin" hidden>Admin panel</a>
-        <button type="button" id="signout-btn">Chiqish</button>
+        <a href="#" data-go="work" data-i18n="nav.myWork">Mening ishim</a>
+        <a href="#" data-go="account" data-i18n="nav.settings">Sozlamalar</a>
+        <a href="/admin" id="menu-admin" hidden data-i18n="nav.admin">Admin panel</a>
+        <button type="button" id="signout-btn" data-i18n="nav.signout">Chiqish</button>
       </div>
     </div>
   </div>
@@ -70,11 +70,8 @@
 <section class="view is-active" id="view-browse">
   <div class="search-hero">
     <div class="wrap">
-      <h1>Davlat xaridlarida qatnashish — <em>hammaga ochiq</em></h1>
-      <p class="search-hero-sub">
-        E'lonlarni toping, har bir lotni oddiy tilda tushuning va hujjatlarni
-        tayyorlang. Tender bilan ilk marta ishlayotgan bo'lsangiz ham.
-      </p>
+      <h1 data-i18n="hero.title">Davlat xaridlarida qatnashish — <em>hammaga ochiq</em></h1>
+      <p class="search-hero-sub" data-i18n="hero.sub">E'lonlarni toping, har bir lotni oddiy tilda tushuning va hujjatlarni tayyorlang.</p>
 
       <form class="searchbar" id="search-form" role="search">
         <div class="searchbar-field">
@@ -82,19 +79,20 @@
             <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2"/>
             <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          <label for="search-input" class="visually-hidden">Nima izlayapsiz?</label>
-          <input type="search" id="search-input" class="input"
-                 placeholder="Nima izlayapsiz? Masalan: parta, kompyuter, ovqat" autocomplete="off">
+          <label for="search-input" class="visually-hidden" data-i18n="hero.searchLabel">Nima izlayapsiz?</label>
+          <input type="search" id="search-input" class="input" autocomplete="off"
+                 data-i18n-attr="placeholder:hero.searchPlaceholder"
+                 placeholder="Nima izlayapsiz? Masalan: parta, kompyuter, ovqat">
         </div>
-        <button type="submit" class="btn btn-primary btn-lg">Qidirish</button>
+        <button type="submit" class="btn btn-primary btn-lg" data-i18n="hero.searchButton">Qidirish</button>
       </form>
 
       <!-- Bu raqamlar bazadagi haqiqiy holatdan olinadi. Hisoblab
            bo'lmaydigan ko'rsatkich bu yerda ko'rsatilmaydi. -->
       <p class="search-stats" id="search-stats">
-        <span><b id="stat-tenders">—</b> ta faol e'lon</span>
-        <span><b id="stat-sectors">—</b> ta soha</span>
-        <span><b id="stat-regions">—</b> ta hudud</span>
+        <span><b id="stat-tenders">—</b> <span data-i18n="hero.statTenders">ta faol e'lon</span></span>
+        <span><b id="stat-sectors">—</b> <span data-i18n="hero.statSectors">ta soha</span></span>
+        <span><b id="stat-regions">—</b> <span data-i18n="hero.statRegions">ta hudud</span></span>
       </p>
 
       <a href="#" class="beginner-door" data-go="guide">
@@ -103,8 +101,8 @@
           <path d="M7.8 7.6a2.2 2.2 0 114 1.3c-.6.7-1.3 1-1.3 1.9M10 14.2h.01"
                 stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
         </svg>
-        <strong>Birinchi marta?</strong>
-        <span>Qadamma-qadam boshlang — 10 daqiqa</span>
+        <strong data-i18n="hero.beginnerTitle">Birinchi marta?</strong>
+        <span data-i18n="hero.beginnerText">Qadamma-qadam boshlang — 10 daqiqa</span>
       </a>
     </div>
   </div>
@@ -114,21 +112,21 @@
       <!-- Filtrlar -->
       <aside class="filters" aria-label="Filtrlar">
         <div class="filter-group">
-          <h3>Soha</h3>
+          <h3 data-i18n="filter.sector">Soha</h3>
           <div id="filter-sectors" class="filter-options-scroll"></div>
         </div>
 
         <div class="filter-group">
-          <h3>Hudud</h3>
-          <label for="filter-region" class="visually-hidden">Hudud</label>
+          <h3 data-i18n="filter.region">Hudud</h3>
+          <label for="filter-region" class="visually-hidden" data-i18n="filter.region">Hudud</label>
           <select id="filter-region" class="select">
             <option value="all">Barcha hududlar</option>
           </select>
         </div>
 
         <div class="filter-group">
-          <h3>Holat</h3>
-          <label for="filter-status" class="visually-hidden">Holat</label>
+          <h3 data-i18n="filter.status">Holat</h3>
+          <label for="filter-status" class="visually-hidden" data-i18n="filter.status">Holat</label>
           <select id="filter-status" class="select">
             <option value="active">Faol e'lonlar</option>
             <option value="all">Barchasi</option>
@@ -136,7 +134,7 @@
           </select>
         </div>
 
-        <button type="button" class="filter-reset" id="filter-reset">Filtrlarni tozalash</button>
+        <button type="button" class="filter-reset" id="filter-reset" data-i18n="filter.reset">Filtrlarni tozalash</button>
       </aside>
 
       <!-- Natijalar -->
@@ -144,7 +142,7 @@
         <div class="results-head">
           <p class="results-count" id="results-count">Yuklanmoqda…</p>
           <div class="sort">
-            <label for="sort-select">Saralash</label>
+            <label for="sort-select" data-i18n="results.sort">Saralash</label>
             <select id="sort-select" class="select">
               <option value="newest">Yangi e'lonlar</option>
               <option value="date">Muddati yaqin</option>
@@ -164,7 +162,7 @@
 <section class="view" id="view-docs">
   <div class="wrap-narrow">
     <div class="section-head">
-      <h2>Hujjatlarni tayyorlash</h2>
+      <h2 data-i18n="docs.title">Hujjatlarni tayyorlash</h2>
       <p>
         Kompaniya va lot ma'lumotlarini kiriting — tender uchun kerak bo'ladigan
         7 ta shakl tayyorlanadi. Yuborishdan oldin har birini o'zingiz tekshiring.
@@ -173,7 +171,7 @@
 
     <form id="doc-form">
       <div class="panel">
-        <div class="panel-head"><h3>Kompaniya</h3></div>
+        <div class="panel-head"><h3 data-i18n="docs.companySection">Kompaniya</h3></div>
         <div class="grid-2">
           <div class="field">
             <label class="field-label" for="d-company">Kompaniya nomi *</label>
@@ -212,7 +210,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-head"><h3>Lot</h3></div>
+        <div class="panel-head"><h3 data-i18n="docs.lotSection">Lot</h3></div>
         <div class="grid-2">
           <div class="field" style="grid-column: 1 / -1">
             <label class="field-label" for="d-tenderName">Lot yoki tender nomi *</label>
@@ -250,20 +248,20 @@
 <section class="view" id="view-work">
   <div class="wrap">
     <div class="section-head">
-      <h2>Mening ishim</h2>
-      <p>Saqlagan lotlaringiz va yutgan tenderlaringiz.</p>
+      <h2 data-i18n="work.title">Mening ishim</h2>
+      <p data-i18n="work.sub">Saqlagan lotlaringiz va yutgan tenderlaringiz.</p>
     </div>
 
     <div class="panel">
       <div class="panel-head">
-        <h3>Saqlanganlar</h3>
-        <button type="button" class="btn btn-secondary btn-sm" id="compare-btn" hidden>Ikkitasini solishtirish</button>
+        <h3 data-i18n="work.saved">Saqlanganlar</h3>
+        <button type="button" class="btn btn-secondary btn-sm" id="compare-btn" hidden data-i18n="work.compare">Ikkitasini solishtirish</button>
       </div>
       <div id="saved-list"></div>
     </div>
 
     <div class="panel">
-      <div class="panel-head"><h3>Yutganlarim</h3></div>
+      <div class="panel-head"><h3 data-i18n="work.won">Yutganlarim</h3></div>
       <div id="won-list"></div>
     </div>
   </div>
@@ -273,24 +271,24 @@
 <section class="view" id="view-account">
   <div class="wrap-narrow">
     <div class="section-head">
-      <h2>Sozlamalar</h2>
+      <h2 data-i18n="account.title">Sozlamalar</h2>
     </div>
 
     <div class="panel" id="panel-plan"></div>
 
     <div class="panel">
-      <div class="panel-head"><h3>Profil</h3></div>
+      <div class="panel-head"><h3 data-i18n="account.profile">Profil</h3></div>
       <form id="profile-form" class="grid-2">
         <div class="field">
-          <label class="field-label" for="p-name">Ism</label>
+          <label class="field-label" for="p-name" data-i18n="auth.name">Ism</label>
           <input id="p-name" name="name" class="input">
         </div>
         <div class="field">
-          <label class="field-label" for="p-company">Kompaniya</label>
+          <label class="field-label" for="p-company" data-i18n="auth.company">Kompaniya</label>
           <input id="p-company" name="company" class="input">
         </div>
         <div style="grid-column: 1 / -1">
-          <button type="submit" class="btn btn-primary">Saqlash</button>
+          <button type="submit" class="btn btn-primary" data-i18n="account.save">Saqlash</button>
         </div>
       </form>
     </div>
@@ -298,19 +296,19 @@
     <div class="panel" id="panel-telegram"></div>
 
     <div class="panel">
-      <div class="panel-head"><h3>Parolni o'zgartirish</h3></div>
+      <div class="panel-head"><h3 data-i18n="account.changePassword">Parolni o'zgartirish</h3></div>
       <form id="password-form" class="grid-2">
         <div class="field">
-          <label class="field-label" for="p-current">Joriy parol</label>
+          <label class="field-label" for="p-current" data-i18n="account.currentPassword">Joriy parol</label>
           <input id="p-current" name="currentPassword" class="input" type="password" autocomplete="current-password">
         </div>
         <div class="field">
-          <label class="field-label" for="p-new">Yangi parol</label>
+          <label class="field-label" for="p-new" data-i18n="account.newPassword">Yangi parol</label>
           <input id="p-new" name="newPassword" class="input" type="password" autocomplete="new-password">
         </div>
         <div style="grid-column: 1 / -1">
           <p class="field-error" id="password-error"></p>
-          <button type="submit" class="btn btn-primary">O'zgartirish</button>
+          <button type="submit" class="btn btn-primary" data-i18n="account.changePassword">O'zgartirish</button>
         </div>
       </form>
     </div>
@@ -321,7 +319,7 @@
 <section class="view" id="view-guide">
   <div class="wrap-narrow">
     <div class="section-head">
-      <h2>Birinchi tenderingiz</h2>
+      <h2 data-i18n="guide.title">Birinchi tenderingiz</h2>
       <p>
         Tender haqida hech narsa bilmasangiz ham — shu yerdan boshlang.
         Har bir qadam bitta savolga javob beradi.
@@ -331,8 +329,8 @@
     <div class="steps" id="steps"></div>
 
     <div class="section-head" style="margin-top: var(--s8)">
-      <h2>Atamalar</h2>
-      <p>Notanish so'zga duch kelsangiz — shu yerdan qarang.</p>
+      <h2 data-i18n="guide.termsTitle">Atamalar</h2>
+      <p data-i18n="guide.termsSub">Notanish so'zga duch kelsangiz — shu yerdan qarang.</p>
     </div>
     <div id="glossary-list"></div>
   </div>
@@ -342,7 +340,7 @@
 <section class="view" id="view-plans">
   <div class="wrap">
     <div class="section-head">
-      <h2>Tariflar</h2>
+      <h2 data-i18n="plans.title">Tariflar</h2>
       <p>Tenderlarni ko'rish va lotlarni tushunish — har doim bepul.
          Pullik tarif faqat AI hujjat va maslahat limitini kengaytiradi.</p>
     </div>
@@ -357,7 +355,7 @@
   <div class="wrap">
     <div class="foot-row">
       <span>© 2026 TenderMind</span>
-      <span>AI tayyorlagan matnlar insoniy tekshiruvni talab qiladi.</span>
+      <span data-i18n="common.footerNote">AI tayyorlagan matnlar insoniy tekshiruvni talab qiladi.</span>
     </div>
   </div>
 </footer>
@@ -367,16 +365,16 @@
   <ul class="mobilenav-list">
     <li style="flex:1"><a href="#" class="mobilenav-link" data-go="browse" aria-current="page">
       <svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.7"/><path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-      Tenderlar</a></li>
+      <span data-i18n="nav.tenders">Tenderlar</span></a></li>
     <li style="flex:1"><a href="#" class="mobilenav-link" data-go="docs">
       <svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 2.5h6l4 4v11H5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M11 2.5v4h4" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
-      Hujjatlar</a></li>
+      <span data-i18n="nav.docs">Hujjatlar</span></a></li>
     <li style="flex:1"><a href="#" class="mobilenav-link" data-go="guide">
       <svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.7"/><path d="M7.8 7.6a2.2 2.2 0 114 1.3c-.6.7-1.3 1-1.3 1.9M10 14.2h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-      Qo'llanma</a></li>
+      <span data-i18n="nav.guide">Qo'llanma</span></a></li>
     <li style="flex:1"><a href="#" class="mobilenav-link" data-go="work">
       <svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 6.5h14v10H3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7.5 6.5v-2h5v2" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
-      Ishim</a></li>
+      <span data-i18n="nav.work">Ishim</span></a></li>
   </ul>
 </nav>
 
@@ -384,50 +382,50 @@
 <div class="modal" id="auth-modal" hidden role="dialog" aria-modal="true" aria-labelledby="auth-title">
   <div class="modal-box">
     <div class="modal-head">
-      <h2 id="auth-title">Hisobingizga kiring</h2>
+      <h2 id="auth-title" data-i18n="auth.signinTitle">Hisobingizga kiring</h2>
       <button type="button" class="icon-btn" data-close="auth-modal" aria-label="Yopish">✕</button>
     </div>
     <div class="modal-body">
       <div class="tabs" role="tablist">
-        <button type="button" class="tab" role="tab" aria-selected="true" data-auth-tab="login">Kirish</button>
-        <button type="button" class="tab" role="tab" aria-selected="false" data-auth-tab="register">Ro'yxatdan o'tish</button>
+        <button type="button" class="tab" role="tab" aria-selected="true" data-auth-tab="login" data-i18n="auth.tabLogin">Kirish</button>
+        <button type="button" class="tab" role="tab" aria-selected="false" data-auth-tab="register" data-i18n="auth.tabRegister">Ro'yxatdan o'tish</button>
       </div>
 
       <form id="login-form">
         <div class="field" style="margin-bottom: var(--s3)">
-          <label class="field-label" for="l-phone">Telefon</label>
+          <label class="field-label" for="l-phone" data-i18n="auth.phone">Telefon</label>
           <input id="l-phone" name="phone" class="input" type="tel" required
                  placeholder="+998 90 123 45 67" autocomplete="tel">
         </div>
         <div class="field" style="margin-bottom: var(--s2)">
-          <label class="field-label" for="l-password">Parol</label>
+          <label class="field-label" for="l-password" data-i18n="auth.password">Parol</label>
           <input id="l-password" name="password" class="input" type="password" required autocomplete="current-password">
         </div>
         <p class="field-error" id="login-error"></p>
-        <button type="submit" class="btn btn-primary btn-block btn-lg">Kirish</button>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" data-i18n="auth.tabLogin">Kirish</button>
       </form>
 
       <form id="register-form" hidden>
         <div class="field" style="margin-bottom: var(--s3)">
-          <label class="field-label" for="r-name">Ism</label>
+          <label class="field-label" for="r-name" data-i18n="auth.name">Ism</label>
           <input id="r-name" name="name" class="input" required autocomplete="name">
         </div>
         <div class="field" style="margin-bottom: var(--s3)">
-          <label class="field-label" for="r-phone">Telefon</label>
+          <label class="field-label" for="r-phone" data-i18n="auth.phone">Telefon</label>
           <input id="r-phone" name="phone" class="input" type="tel" required
                  placeholder="+998 90 123 45 67" autocomplete="tel">
         </div>
         <div class="field" style="margin-bottom: var(--s3)">
-          <label class="field-label" for="r-company">Kompaniya</label>
+          <label class="field-label" for="r-company" data-i18n="auth.company">Kompaniya</label>
           <input id="r-company" name="company" class="input" placeholder="Ixtiyoriy">
         </div>
         <div class="field" style="margin-bottom: var(--s2)">
-          <label class="field-label" for="r-password">Parol</label>
+          <label class="field-label" for="r-password" data-i18n="auth.password">Parol</label>
           <input id="r-password" name="password" class="input" type="password" required
                  minlength="6" autocomplete="new-password">
         </div>
         <p class="field-error" id="register-error"></p>
-        <button type="submit" class="btn btn-primary btn-block btn-lg">Ro'yxatdan o'tish</button>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" data-i18n="auth.tabRegister">Ro'yxatdan o'tish</button>
       </form>
     </div>
   </div>
@@ -450,12 +448,12 @@
     <path d="M3 5.5A2.5 2.5 0 015.5 3h9A2.5 2.5 0 0117 5.5v6a2.5 2.5 0 01-2.5 2.5H8l-4 3.5v-3.5H5.5A2.5 2.5 0 013 11.5z"
           stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
   </svg>
-  Savolingiz bormi?
+  <span data-i18n="chat.open">Savolingiz bormi?</span>
 </button>
 
 <div class="chat" id="chat" hidden role="dialog" aria-label="AI maslahatchi">
   <div class="chat-head">
-    <h3>AI maslahatchi</h3>
+    <h3 data-i18n="chat.title">AI maslahatchi</h3>
     <div style="display:flex;gap:2px">
       <button type="button" class="icon-btn" id="chat-clear" aria-label="Suhbatni tozalash" title="Tozalash">⟲</button>
       <button type="button" class="icon-btn" id="chat-close" aria-label="Yopish">✕</button>
@@ -463,8 +461,8 @@
   </div>
   <div class="chat-body" id="chat-body"></div>
   <form class="chat-foot" id="chat-form">
-    <label for="chat-input" class="visually-hidden">Savolingiz</label>
-    <textarea id="chat-input" class="textarea" rows="1" placeholder="Savolingizni yozing…"></textarea>
+    <label for="chat-input" class="visually-hidden" data-i18n="chat.yourQuestion">Savolingiz</label>
+    <textarea id="chat-input" class="textarea" rows="1" data-i18n-attr="placeholder:chat.placeholder" placeholder="Savolingizni yozing…"></textarea>
     <button type="submit" class="btn btn-primary" id="chat-send" aria-label="Yuborish">→</button>
   </form>
 </div>

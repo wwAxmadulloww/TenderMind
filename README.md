@@ -60,7 +60,9 @@ assets/css/core.css    Dizayn tizimi — rang, shrift, komponentlar
 assets/css/app.css     Ilova interfeysi
 assets/css/doc.css     Server render qilgan sahifalar + admin
 assets/js/app.js       Ilova mantiqi
+assets/js/i18n.js      Tarjimalar (uz / ru / en)
 assets/js/admin.js     Admin panel mantiqi
+.github/workflows/     CI — har push va PR da testlar
 ```
 
 ---
@@ -90,6 +92,13 @@ Yo'nalish — **rasmiy hujjat**: oq qog'oz, muhr siyohi ko'k (`--seal`), ma'lumo
 Serif tasodifiy tanlanmagan: rasmiy hujjat va uni tushuntirayotgan odam — ikki xil ovoz, shuning uchun ikki xil harf. Tushuntirish paneli (`.plain`) shu tufayli sahifada alohida ajralib turadi — bu mahsulotning asosiy g'oyasi.
 
 Barcha rang va o'lcham qiymatlari `assets/css/core.css` da CSS o'zgaruvchilari sifatida. Boshqa faylda qo'lda rang yozilmaydi.
+
+### Tillar
+Interfeys **uz / ru / en**. O'zbekiston biznesida rus tili keng ishlatiladi, shuning uchun RU to'liq qo'llab-quvvatlanadi.
+
+Brauzer tili bo'yicha avtomatik tanlash **ataylab qilinmagan**: e'lon sarlavhalari va tashkilot nomlari bazada o'zbekcha, interfeysni inglizchaga o'girish ularni tarjima qilmaydi va aralash sahifa chiqadi. Standart til — o'zbekcha, tanlov `localStorage` da saqlanadi.
+
+Yangi matn qo'shganda: HTML da `data-i18n="kalit"`, JS da `t('kalit')`. Kod ichida qo'lda yozilgan matn qolmasin — u til almashtirilganda o'zbekcha bo'lib qolaveradi.
 
 ### Qidiruv tizimlari uchun sahifalar
 SPA mazmuni JavaScript'siz ko'rinmaydi, shuning uchun har bir tender uchun alohida server tomonda render qilinadigan sahifa bor:
