@@ -54,8 +54,13 @@ middleware/            auth, admin, quota, dbReady
 data/                  Lug'at, yo'riqnoma, namuna ma'lumot
 scripts/               CLI vositalar
 tests/                 Testlar (node:test + xotiradagi MongoDB)
-index.html / app.js    Foydalanuvchi interfeysi
-admin.html / admin.js  Admin panel (/admin)
+index.html             Ilova qobig'i (SPA)
+admin.html             Admin panel (/admin)
+assets/css/core.css    Dizayn tizimi — rang, shrift, komponentlar
+assets/css/app.css     Ilova interfeysi
+assets/css/doc.css     Server render qilgan sahifalar + admin
+assets/js/app.js       Ilova mantiqi
+assets/js/admin.js     Admin panel mantiqi
 ```
 
 ---
@@ -72,6 +77,19 @@ Tushuntirish **AI ulanmagan bo'lsa ham to'liq ishlaydi** — lot ma'lumotidan qu
 ### Ta'lim qatlami
 - 18 ta atama lug'ati — matnda uchraganda bosilsa izoh va hayotiy misol chiqadi.
 - "Birinchi tenderingiz" — 6 qadamli yo'riqnoma, ro'yxatdan o'tmasdan ham o'qiladi.
+
+### Dizayn tizimi
+Yo'nalish — **rasmiy hujjat**: oq qog'oz, muhr siyohi ko'k (`--seal`), ma'lumot uchun mono shrift. Uch xil ovoz uchun uch xil shrift:
+
+| Shrift | Qayerda |
+|---|---|
+| IBM Plex Sans | Interfeys va rasmiy ma'lumot |
+| IBM Plex Mono | Summalar, muddatlar, hujjat raqamlari |
+| IBM Plex Serif | **Faqat** "oddiy tilda" tushuntirish panellarida |
+
+Serif tasodifiy tanlanmagan: rasmiy hujjat va uni tushuntirayotgan odam — ikki xil ovoz, shuning uchun ikki xil harf. Tushuntirish paneli (`.plain`) shu tufayli sahifada alohida ajralib turadi — bu mahsulotning asosiy g'oyasi.
+
+Barcha rang va o'lcham qiymatlari `assets/css/core.css` da CSS o'zgaruvchilari sifatida. Boshqa faylda qo'lda rang yozilmaydi.
 
 ### Qidiruv tizimlari uchun sahifalar
 SPA mazmuni JavaScript'siz ko'rinmaydi, shuning uchun har bir tender uchun alohida server tomonda render qilinadigan sahifa bor:

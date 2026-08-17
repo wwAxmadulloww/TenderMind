@@ -49,7 +49,7 @@ async function generateDocuments(req, res) {
   if (!isGeminiConfigured()) {
     return res.status(503).json({
       error: 'API_KEY_MISSING',
-      message: '.env faylida GEMINI_API_KEY sozlanmagan'
+      message: 'AI xizmati hozir mavjud emas. Birozdan keyin urinib ko\'ring.'
     });
   }
 
@@ -97,7 +97,7 @@ JSON formatda qaytar (faqat JSON, boshqa hech narsa yo'q):
   } catch (err) {
     logger.error('AI API error', err);
     if (err.status === 401 || (err.message && err.message.includes('API_KEY'))) {
-      return res.status(401).json({ error: 'Gemini API kalit yaroqsiz. .env faylini tekshiring.' });
+      return res.status(503).json({ error: 'AI xizmati hozir mavjud emas. Birozdan keyin urinib ko\'ring.' });
     }
     if (err.message && err.message.includes('404')) {
       return res.status(503).json({ error: 'AI modeli topilmadi. Administrator bilan bog\'laning.' });
@@ -529,7 +529,7 @@ async function generateFallbackChatReply(message, tenderContext) {
       '• **Hujjatlar** — nima qila olishingiz va qancha narxlash haqida\n' +
       '• **Muddat** — qachongacha topshirish kerak\n\n' +
       '**TenderMind** ilovasidagi ro\'yxat — **o\'rganish uchun demo** tenderlar; haqiqiy e\'lonlar uchun rasmiy **xarid.uz** (va tegishli) portallarni tekshiring.\n\n' +
-      'Hozir **API kaliti yo\'q** — men to\'liq suhbat rejimida emasman. To\'liq "ChatGPT kabi" javoblar uchun `.env` ga `GEMINI_API_KEY` qo\'shing.\n\n' +
+      '_Hozir men qisqartirilgan rejimda ishlayapman, shuning uchun javoblarim umumiyroq._\n\n' +
       'Keyingi qadam sifatida yozing: "Qanday hujjatlar kerak?" yoki "Narxni qanday belgilash mumkin?" — yoki ilovadan bitta tenderni tanlab **AI dan maslahat** qiling.'
     );
   }
@@ -548,19 +548,19 @@ async function generateFallbackChatReply(message, tenderContext) {
         `**Amaliy maslahat:** texnik taklifni batafsil yozing, narxni odatda byudjetning **85–92%** atrofida rejalashtirish ko'p hollarda mantiqiy; hujjatlarni muddatdan oldin topshiring.\n\n` +
         (isGeminiConfigured()
           ? ''
-          : '_To\'liq batafsil suhbat uchun API kalitini ulang._\n\n') +
+          : '_Hozir qisqartirilgan rejimdaman — javoblarim umumiyroq._\n\n') +
         `Yana nimani tushuntirish kerak — narx, hujjatlar yoki strategiya?`;
     }
   }
 
   if (/salom|assalom|hello|hi\b|privet/.test(msg)) {
     return (
-      'Salom! Men TenderMind **AI maslahatchi**man (hozir cheklangan rejim: API kalitsiz shablon javoblar).\n\n' +
+      'Salom! Men TenderMind **AI maslahatchi**man.\n\n' +
       'Menga **har qanday** tender haqida savol bering — masalan:\n' +
       '• "Tender va oddiy xarid farqi nima?"\n' +
       '• "Birinchi marta qatnashmoqchiman, nimadan boshlayman?"\n' +
       '• "Texnik taklifda nima bo\'lishi kerak?"\n\n' +
-      'Haqiqiy suhbat va chuqur javoblar uchun loyihada **GEMINI_API_KEY** sozlansin.'
+      '_Hozir qisqartirilgan rejimdaman, lekin asosiy savollarga javob bera olaman._'
     );
   }
 
@@ -586,7 +586,7 @@ async function generateFallbackChatReply(message, tenderContext) {
       `• Ko'p hollarda taklif **byudjetdan past** bo'ladi; juda ham past bo'lsa, ishonchlilik shubhasi tug'ilishi mumkin.\n` +
       `• **Texnik qism** va **tajriba** ham baholanadi — faqat eng arzon emas.\n` +
       `• Smetada **xarajat turlari** (materiallar, mehnat, transport, boshqaruv, rezerv) ko'rinadigan qilib yozish yaxshi.\n\n` +
-      `Konkret tender byudjetini aytsangiz, taxminiy diapazon haqida gaplashamiz (to'liq rejimda API kalit kerak).`;
+      `Konkret lot byudjetini aytsangiz, taxminiy diapazon haqida gaplashamiz.`;
   }
 
   if (msg.includes('hujjat') || msg.includes('document') || msg.includes('tayyorl')) {
@@ -596,7 +596,7 @@ async function generateFallbackChatReply(message, tenderContext) {
       `• **Kompaniya to'g'risida** — guvohnomalar, tajriba\n` +
       `• **Litsenziya / sertifikat** (soha bo'yicha)\n\n` +
       `TenderMind **Hujjat** bo'limida AI yordamida namunalar yaratish mumkin — lekin yuborishdan oldin **o'zingiz tekshiring**.\n\n` +
-      `API kalitsiz men faqat umumiy ro'yxatni beraman; batafsil matn uchun kalitni ulang.`;
+      `Hozir men umumiy ro'yxatni beraman — aniq lotni tanlasangiz, batafsilroq aytaman.`;
   }
 
   if (msg.includes('strategiya') || msg.includes('g\'alaba') || msg.includes('yutish') || msg.includes('win')) {
@@ -615,7 +615,7 @@ async function generateFallbackChatReply(message, tenderContext) {
     '• "Tender nima va qanday ishlaydi?"\n' +
     '• "Boshlang\'ich uchun qadam-baqadam tushuntir"\n' +
     '• "Narx, hujjat, strategiya haqida maslahat"\n\n' +
-    '**To\'liq erkin suhbat** uchun loyiha ildizida `.env` faylida `GEMINI_API_KEY=...` qo\'ying va serverni qayta ishga tushiring.\n\n' +
+
     `Savolingiz: _"${message.slice(0, 200)}${message.length > 200 ? '…' : ''}"_ — yuqoridagi mavzulardan birini tanlang yoki savolni aniqroq yozing.`
   );
 }

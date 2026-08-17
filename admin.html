@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>TenderMind — Admin panel</title>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/assets/css/core.css">
+  <link rel="stylesheet" href="/assets/css/doc.css">
 </head>
 <body class="admin-body">
 
@@ -16,13 +17,13 @@
       <h1>TenderMind Admin</h1>
       <p class="admin-login-sub">Boshqaruv paneliga kirish</p>
       <form onsubmit="adminLogin(event)">
-        <div class="form-group">
-          <label class="form-label">Telefon</label>
-          <input type="tel" id="admin-phone" class="form-input" placeholder="+998901234567" required>
+        <div class="field">
+          <label class="field-label">Telefon</label>
+          <input type="tel" id="admin-phone" class="input" placeholder="+998901234567" required>
         </div>
-        <div class="form-group">
-          <label class="form-label">Parol</label>
-          <input type="password" id="admin-password" class="form-input" required>
+        <div class="field">
+          <label class="field-label">Parol</label>
+          <input type="password" id="admin-password" class="input" required>
         </div>
         <div id="admin-login-error" class="admin-error"></div>
         <button type="submit" class="admin-btn primary full">Kirish</button>
@@ -66,6 +67,6 @@
 
 <div id="admin-toast" class="admin-toast"></div>
 
-<script src="/admin.js"></script>
+<script src="/assets/js/admin.js"></script>
 </body>
 </html>

@@ -182,14 +182,15 @@ ${noindex ? '<meta name="robots" content="noindex, follow">' : '<meta name="robo
 <meta property="og:locale" content="uz_UZ">
 <meta name="twitter:card" content="summary">
 
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/assets/css/core.css">
+<link rel="stylesheet" href="/assets/css/doc.css">
 <script type="application/ld+json">${safeJsonLd(buildJsonLd(tender, lots))}</script>
 </head>
 <body class="seo-body">
 
 <header class="seo-header">
   <a href="/" class="seo-brand"><span class="logo-icon">⬡</span> TenderMind</a>
-  <a href="/#app" class="seo-cta">Ilovaga kirish</a>
+  <a href="/#browse" class="seo-cta">Ilovaga kirish</a>
 </header>
 
 <main class="seo-main">
@@ -237,9 +238,9 @@ ${noindex ? '<meta name="robots" content="noindex, follow">' : '<meta name="robo
     <p>
       TenderMind sizga hujjatlarni tayyorlashda yordam beradi va har bir lotni
       oddiy tilda tushuntiradi. Tender bilan ilk marta ishlayotgan bo'lsangiz —
-      <a href="/#onboarding">boshlang'ich yo'riqnomadan</a> boshlang.
+      <a href="/#guide">boshlang'ich yo'riqnomadan</a> boshlang.
     </p>
-    <a href="/#app" class="seo-cta">Bepul boshlash</a>
+    <a href="/#browse" class="seo-cta">Bepul boshlash</a>
   </div>
 </main>
 
@@ -291,13 +292,14 @@ function renderCategoryPage(soha, tenders = []) {
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
 <meta property="og:url" content="${escapeHtml(url)}">
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/assets/css/core.css">
+<link rel="stylesheet" href="/assets/css/doc.css">
 </head>
 <body class="seo-body">
 
 <header class="seo-header">
   <a href="/" class="seo-brand"><span class="logo-icon">⬡</span> TenderMind</a>
-  <a href="/#app" class="seo-cta">Ilovaga kirish</a>
+  <a href="/#browse" class="seo-cta">Ilovaga kirish</a>
 </header>
 
 <main class="seo-main">
@@ -372,7 +374,8 @@ function renderNotFound() {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tender topilmadi — TenderMind</title>
 <meta name="robots" content="noindex, follow">
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/assets/css/core.css">
+<link rel="stylesheet" href="/assets/css/doc.css">
 </head>
 <body class="seo-body">
 <header class="seo-header">

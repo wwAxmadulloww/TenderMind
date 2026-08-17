@@ -1,766 +1,479 @@
 <!DOCTYPE html>
 <html lang="uz">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TenderMind — AI bilan Tenderni Yuting | O'zbekiston</title>
-  <meta name="description" content="TenderMind — O'zbekiston davlat tenderlarini AI yordamida tahlil qiling, hujjatlar tayyorlang va g'alaba strategiyasini ishlab chiqing." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <!-- XATO #1 TUZATMA: script taglar HEAD ichida bo'lmasligi kerak
-       app.js va i18n.js faqat body oxirida yuklanadi — pastga qarang -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TenderMind — O'zbekiston davlat xaridlari</title>
+<meta name="description" content="Davlat tenderlarini toping, har bir lotni oddiy tilda tushuning va hujjatlarni tayyorlang. Tender bilan ilk marta ishlayotganlar uchun ham.">
+<link rel="canonical" href="/">
+<meta property="og:title" content="TenderMind — O'zbekiston davlat xaridlari">
+<meta property="og:description" content="Tenderlarni toping, lotni oddiy tilda tushuning, hujjatni tayyorlang.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="uz_UZ">
+
+<link rel="stylesheet" href="/assets/css/core.css">
+<link rel="stylesheet" href="/assets/css/app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2l8.5 5v10L12 22 3.5 17V7z' fill='none' stroke='%231B3A6B' stroke-width='2'/%3E%3C/svg%3E">
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════ LANDING PAGE ═══ -->
-<div id="landing-page" class="page active">
+<a href="#main" class="visually-hidden">Asosiy mazmunga o'tish</a>
 
-  <!-- TICKER BAR -->
-  <div class="ticker-bar" id="ticker-bar">
-    <div class="ticker-track">
-      <span class="ticker-item">🟢 Yangi tender: Toshkent IT infratuzilmasi — 4.2 mlrd so'm</span>
-      <span class="ticker-sep">•</span>
-      <span class="ticker-item">📋 Samarqand qurilish loyihasi — 12.8 mlrd so'm</span>
-      <span class="ticker-sep">•</span>
-      <span class="ticker-item">⚡ Namangan tibbiyot jihozlari — 2.1 mlrd so'm</span>
-      <span class="ticker-sep">•</span>
-      <span class="ticker-item">🏗️ Andijon yo'l ta'miri tenderi — 7.5 mlrd so'm</span>
-      <span class="ticker-sep">•</span>
-      <span class="ticker-item">🎓 Buxoro ta'lim texnologiyalari — 890 mln so'm</span>
-    </div>
-  </div>
+<!-- ══ Yuqori panel ══════════════════════════════════════════════ -->
+<header class="topbar">
+  <a href="#" class="brand" data-go="browse">
+    <svg class="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 2l8.5 5v10L12 22 3.5 17V7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M8 11.5l2.8 2.8L16 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    TenderMind
+  </a>
 
-  <!-- NAVIGATION -->
-  <nav class="navbar" id="navbar">
-    <div class="nav-container">
-      <a href="#" class="nav-logo" onclick="showPage('landing-page')">
-        <img src="logo.png" alt="TenderMind" class="nav-logo-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-        <span class="nav-logo-fallback" style="display:none;align-items:center;gap:8px"><span class="logo-icon">⬡</span><span class="logo-text">TenderMind</span></span>
-      </a>
-      <div class="nav-links">
-        <a href="#features" class="nav-link" data-i18n="navFeatures">Imkoniyatlar</a>
-        <a href="#how-it-works" class="nav-link" data-i18n="navHowItWorks">Qanday ishlaydi</a>
-        <a href="#pricing" class="nav-link" data-i18n="navPricing">Narxlar</a>
-      </div>
-      <div class="nav-right">
-        <!-- LANG SWITCHER -->
-        <div class="lang-switcher">
-          <button class="lang-btn active" data-lang="uz" onclick="setLang('uz')">UZ</button>
-          <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">RU</button>
-          <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
-        </div>
-
-        <div id="profile-menu" class="profile-menu">
-          <div class="profile-menu-header"><span id="user-info" data-i18n="cabProfile">Mening profilim</span></div>
-          <button onclick="switchTab('cabinet');showPage('app-page')" data-i18n="navCabinet">👤 Shaxsiy kabinet</button>
-          <button onclick="switchTab('saved');showPage('app-page')" data-i18n="navSaved">🏷️ Saqlangan tenderlar</button>
-          <button onclick="doLogout()" data-i18n="navLogOut">🚪 Chiqish</button>
-        </div>
-        <button class="btn-primary nav-cta" id="auth-nav-btn" onclick="showModal('auth-modal')" data-i18n="navLogIn">
-          Kirish
-        </button>
-        <button class="btn-primary nav-cta" onclick="showPage('app-page')" style="background:transparent;border:1px solid var(--border-bright);color:var(--text)">
-          <span data-i18n="navStart">Boshlash →</span>
-        </button>
-      </div>
-    </div>
+  <nav class="topnav" aria-label="Asosiy">
+    <a href="#" class="topnav-link" data-go="browse" aria-current="page">Tenderlar</a>
+    <a href="#" class="topnav-link" data-go="docs">Hujjatlar</a>
+    <a href="#" class="topnav-link" data-go="guide">Qo'llanma</a>
+    <a href="#" class="topnav-link" data-go="plans">Narxlar</a>
   </nav>
 
-  <!-- HERO SECTION -->
-  <section class="hero" id="hero">
-    <div class="hero-bg-grid"></div>
-    <div class="hero-particles" id="hero-particles"></div>
-    <div class="hero-container">
-      <div class="hero-badge">
-        <span class="badge-dot"></span>
-        O'zbekiston uchun maxsus yaratilgan
+  <div class="topbar-end">
+    <div class="lang-switch" role="group" aria-label="Til">
+      <button type="button" data-lang="uz" aria-pressed="true">UZ</button>
+      <button type="button" data-lang="ru" aria-pressed="false">RU</button>
+      <button type="button" data-lang="en" aria-pressed="false">EN</button>
+    </div>
+
+    <button type="button" class="btn btn-secondary btn-sm" id="signin-btn">Kirish</button>
+
+    <div class="account" id="account" hidden>
+      <button type="button" class="account-btn" id="account-btn" aria-expanded="false" aria-haspopup="true">
+        <span class="avatar" id="account-initial">?</span>
+        <span id="account-name">—</span>
+      </button>
+      <div class="account-menu" id="account-menu" hidden>
+        <div class="account-menu-head">
+          <div class="account-menu-name" id="menu-name">—</div>
+          <div class="account-menu-plan" id="menu-plan">—</div>
+        </div>
+        <a href="#" data-go="work">Mening ishim</a>
+        <a href="#" data-go="account">Sozlamalar</a>
+        <a href="/admin" id="menu-admin" hidden>Admin panel</a>
+        <button type="button" id="signout-btn">Chiqish</button>
       </div>
-      <h1 class="hero-title" data-i18n="heroTitle">
-        Tenderni <span class="accent-text">AI</span> bilan<br/>
-        <span class="hero-title-line2">yuting</span>
-      </h1>
-      <p class="hero-subtitle" data-i18n="heroSubtitle">
-        Davlat tenderlarini tahlil qiling, raqiblarni o'rganing, hujjatlarni avtomatik tayyorlang — barisi sun'iy intellekt yordamida.
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ══ TENDERLAR ═════════════════════════════════════════════════ -->
+<section class="view is-active" id="view-browse">
+  <div class="search-hero">
+    <div class="wrap">
+      <h1>Davlat xaridlarida qatnashish — <em>hammaga ochiq</em></h1>
+      <p class="search-hero-sub">
+        E'lonlarni toping, har bir lotni oddiy tilda tushuning va hujjatlarni
+        tayyorlang. Tender bilan ilk marta ishlayotgan bo'lsangiz ham.
       </p>
-      <div class="hero-actions">
-        <button class="btn-hero-primary" onclick="showPage('app-page')">
-          <span data-i18n="btnTryFree">Bepul sinab ko'ring</span>
-          <span class="btn-glow"></span>
-        </button>
-        <button class="btn-hero-secondary" onclick="scrollToSection('how-it-works')">
-          <span data-i18n="btnHowItWorks">▶ Qanday ishlaydi</span>
-        </button>
-      </div>
-      <div class="hero-disclaimer">
-        <span class="disclaimer-icon">⚠️</span>
-        <span>AI hujjat tayyorlaydi, lekin <strong>inson ko'rib chiqishi</strong> majburiy</span>
-      </div>
-    </div>
-    <div class="hero-visual">
-      <div class="hero-card floating-card-1">
-        <div class="mini-card-header"><span class="mini-dot green"></span><span data-i18n="winProbTitle">G'alaba ehtimoli</span></div>
-        <div class="mini-card-value">87%</div>
-        <div class="mini-progress-bar"><div class="mini-progress" style="width:87%"></div></div>
-      </div>
-      <div class="hero-card floating-card-2">
-        <div class="mini-card-header"><span class="mini-dot yellow"></span><span data-i18n="competitorsTitle">Raqiblar</span></div>
-        <div class="mini-card-value">3 ta</div>
-        <div class="mini-tags"><span class="mini-tag">AlphaTech</span><span class="mini-tag">BuildCo</span></div>
-      </div>
-    </div>
-  </section>
 
-  <!-- STATS BAR -->
-  <section class="stats-bar">
-    <div class="stats-container">
-      <div class="stat-item"><div class="stat-number" data-target="30">0</div><div class="stat-label" data-i18n="statsActive">Aktiv tenderlar bazada</div></div>
-      <div class="stat-divider"></div>
-      <div class="stat-item"><div class="stat-number" data-target="340">0</div><div class="stat-label" data-i18n="statsCompanies">Kompaniyalar foydalanmoqda</div></div>
-      <div class="stat-divider"></div>
-      <div class="stat-item"><div class="stat-number" data-target="73" data-suffix="%">0</div><div class="stat-label" data-i18n="statsWinRate">O'rtacha g'alaba darajasi</div></div>
-      <div class="stat-divider"></div>
-      <div class="stat-item"><div class="stat-number" data-target="4200" data-suffix="+ mlrd">0</div><div class="stat-label" data-i18n="statsAnalyzed">So'mlik tenderlar tahlil qilindi</div></div>
-    </div>
-  </section>
+      <form class="searchbar" id="search-form" role="search">
+        <div class="searchbar-field">
+          <svg class="searchbar-icon" width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2"/>
+            <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <label for="search-input" class="visually-hidden">Nima izlayapsiz?</label>
+          <input type="search" id="search-input" class="input"
+                 placeholder="Nima izlayapsiz? Masalan: parta, kompyuter, ovqat" autocomplete="off">
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg">Qidirish</button>
+      </form>
 
-  <!-- FEATURES SECTION -->
-  <section class="features" id="features">
-    <div class="section-container">
-      <div class="section-header">
-        <span class="section-tag" data-i18n="navFeatures">Imkoniyatlar</span>
-      </div>
-      <div class="features-grid">
-        <div class="feature-card" id="feature-card-1">
-          <div class="feature-icon-wrapper"><div class="feature-icon">🔍</div></div>
-          <h3 class="feature-title" data-i18n="featureSmartTitle">Aqlli Tahlil</h3>
-          <p class="feature-desc" data-i18n="featureSmartDesc">30+ O'zbekiston davlat tenderlari ma'lumotlar bazasidan real vaqt rejimida qidirish va filtrlash.</p>
-          <div class="feature-accent-line"></div>
-        </div>
-        <div class="feature-card featured" id="feature-card-2">
-          <div class="feature-icon-wrapper"><div class="feature-icon">📝</div></div>
-          <h3 class="feature-title" data-i18n="featureDocTitle">AI Hujjat Generator</h3>
-          <p class="feature-desc" data-i18n="featureDocDesc">AI yordamida texnik taklif, moliyaviy hisob va kompaniya profili hujjatlarini yaratish. Real AI — demo emas!</p>
-          <div class="feature-accent-line"></div>
-        </div>
-        <div class="feature-card" id="feature-card-3">
-          <div class="feature-icon-wrapper"><div class="feature-icon">🎯</div></div>
-          <h3 class="feature-title" data-i18n="featureStrategyTitle">AI Strategiya</h3>
-          <p class="feature-desc" data-i18n="featureStrategyDesc">Har bir tender uchun AI tomonidan ishlab chiqilgan strategiya: narx taktikasi, raqib zaifliklarini aniqlash.</p>
-          <div class="feature-accent-line"></div>
-        </div>
-      </div>
-    </div>
-  </section>
+      <!-- Bu raqamlar bazadagi haqiqiy holatdan olinadi. Hisoblab
+           bo'lmaydigan ko'rsatkich bu yerda ko'rsatilmaydi. -->
+      <p class="search-stats" id="search-stats">
+        <span><b id="stat-tenders">—</b> ta faol e'lon</span>
+        <span><b id="stat-sectors">—</b> ta soha</span>
+        <span><b id="stat-regions">—</b> ta hudud</span>
+      </p>
 
-  <!-- HOW IT WORKS SECTION -->
-  <section class="how-it-works" id="how-it-works" style="padding: 100px 0; background: var(--bg); position: relative; border-bottom: 1px solid var(--border);">
-    <div class="section-container">
-      <div class="section-header">
-        <span class="section-tag" data-i18n="navHowItWorks">Qanday ishlaydi</span>
-      </div>
-      <div class="steps-container">
-        <div class="step">
-          <div class="step-number">1</div>
-          <div class="step-line"></div>
-          <div class="step-content">
-            <h3 class="step-title">Tender qidirish</h3>
-            <p class="step-desc">Sun'iy intellekt 30+ davlat va xususiy platformalarni skanerlab, mos tenderlarni topadi.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-number">2</div>
-          <div class="step-line"></div>
-          <div class="step-content">
-            <h3 class="step-title">Raqiblarni tahlil qilish</h3>
-            <p class="step-desc">Tenderda kimlar qatnashayotgani, ularning avvalgi yutuqlari va ehtimoliy narxi baxolanadi.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-number">3</div>
-          <div class="step-line"></div>
-          <div class="step-content">
-            <h3 class="step-title">Hujjatlarni avto-generatsiya</h3>
-            <p class="step-desc">Kompaniyangiz ma'lumotlaridan foydalanib, 8 soniyada 3 xil rasmiy hujjat tayyorlaydi.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PRICING SECTION -->
-  <section class="pricing" id="pricing" style="padding: 100px 0;">
-    <div class="section-container">
-      <div class="section-header">
-        <span class="section-tag" data-i18n="navPricing">Narxlar</span>
-      </div>
-      <!-- Narxlar va imkoniyatlar serverdan olinadi (config/plans.js).
-           Shu tufayli sahifadagi ma'lumot amaldagi limitlar bilan
-           har doim mos bo'ladi. -->
-      <div class="pricing-grid" id="pricing-grid">
-        <div class="pricing-loading">Tariflar yuklanmoqda...</div>
-      </div>
-      <p class="pricing-disclaimer" id="pricing-note"></p>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer class="footer">
-    <div class="footer-bottom">
-      <span>© 2026 TenderMind.</span>
-      <span class="footer-ai-note">🤖 AI · Insoniy tekshiruv majburiy</span>
-    </div>
-  </footer>
-</div>
-
-<!-- ═════════════════════════════════════════════════ APP PAGE ═══ -->
-<div id="app-page" class="page">
-  <div class="app-navbar">
-    <div class="app-nav-container">
-      <button class="back-btn" onclick="showPage('landing-page')">← Orqaga</button>
-      <div class="app-logo">
-        <span class="logo-icon">⬡</span>
-        <img src="logo.png" alt="TenderMind" style="height:36px;object-fit:contain" onerror="this.style.display='none'">
-        <span class="logo-text" style="display:none">TenderMind</span>
-        <span class="app-label">v2.1</span>
-      </div>
-      <div class="app-nav-right">
-        <!-- LANG SWITCHER APP -->
-        <div class="lang-switcher">
-          <button class="lang-btn active" data-lang="uz" onclick="setLang('uz')">UZ</button>
-          <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">RU</button>
-          <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
-        </div>
-        <button class="btn-guide-open" onclick="openGuide()" title="Tender bilan birinchi marta ishlayapsizmi? Shu yerdan boshlang">
-          🎓 Boshlang'ich yo'riqnoma
-        </button>
-        <div class="ai-status"><span class="ai-dot pulsing"></span>AI faol</div>
-        <div id="profile-menu-app" class="profile-menu" style="position:relative">
-          <button class="btn-app-auth" id="auth-app-btn" onclick="showModal('auth-modal')" data-i18n="navLogIn">Kirish</button>
-        </div>
-      </div>
+      <a href="#" class="beginner-door" data-go="guide">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M7.8 7.6a2.2 2.2 0 114 1.3c-.6.7-1.3 1-1.3 1.9M10 14.2h.01"
+                stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <strong>Birinchi marta?</strong>
+        <span>Qadamma-qadam boshlang — 10 daqiqa</span>
+      </a>
     </div>
   </div>
 
-  <!-- TABS -->
-  <div class="app-body">
-    <div class="tabs-container">
-      <div class="tabs-header">
-        <button class="tab-btn active" id="tab-tenderlar" onclick="switchTab('tenderlar')">
-          <span class="tab-icon">🔍</span> <span data-i18n="tabTenders">Tenderlar</span>
-        </button>
-        <button class="tab-btn" id="tab-hujjat" onclick="switchTab('hujjat')">
-          <span class="tab-icon">📝</span> <span data-i18n="tabDoc">Hujjat</span>
-        </button>
-        <button class="tab-btn" id="tab-strategiya" onclick="switchTab('strategiya')">
-          <span class="tab-icon">🎯</span> <span data-i18n="tabStrategy">Strategiya</span>
-        </button>
-        <button class="tab-btn" id="tab-saved" onclick="switchTab('saved')" style="display:none">
-          <span class="tab-icon">🏷️</span> <span data-i18n="tabSaved">Saqlangan</span>
-        </button>
-        <button class="tab-btn" id="tab-won" onclick="switchTab('won')" style="display:none; color: var(--yellow);">
-          <span class="tab-icon">🏆</span> <span data-i18n="tabWon">Yutganlarim</span>
-        </button>
-        <button class="tab-btn" id="tab-cabinet" onclick="switchTab('cabinet')" style="display:none; margin-left: auto; border: 1px dashed var(--accent);">
-          <span class="tab-icon">👤</span> <span data-i18n="tabCabinet">Kabinet</span>
-        </button>
-      </div>
-
-      <!-- ══ TAB 1: TENDERLAR ══ -->
-      <div class="tab-content active" id="content-tenderlar">
-        <div class="tab-inner">
-          <div class="filters-bar">
-            <div class="filter-group">
-              <label class="filter-label" for="filter-soha" data-i18n="filterIndustry">Soha</label>
-              <select class="filter-select" id="filter-soha" onchange="filterTenders()">
-                <option value="all">Barchasi</option>
-                <option value="it">IT va Texnologiya</option>
-                <option value="qurilish">Qurilish</option>
-                <option value="tibbiyot">Tibbiyot</option>
-                <option value="oziq">Oziq-ovqat</option>
-                <option value="transport">Transport</option>
-                <option value="talim">Ta'lim</option>
-                <option value="ekologiya">Ekologiya</option>
-                <option value="qishloq">Qishloq xo'jaligi</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label class="filter-label" for="filter-hudud">Hudud</label>
-              <select class="filter-select" id="filter-hudud" onchange="filterTenders()">
-                <option value="all">Barchasi</option>
-                <option value="toshkent">Toshkent</option>
-                <option value="samarqand">Samarqand</option>
-                <option value="namangan">Namangan</option>
-                <option value="andijon">Andijon</option>
-                <option value="fargona">Farg'ona</option>
-                <option value="buxoro">Buxoro</option>
-                <option value="qashqadaryo">Qashqadaryo</option>
-                <option value="xorazm">Xorazm</option>
-                <option value="surxondaryo">Surxondaryo</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label class="filter-label" for="filter-status">Holat</label>
-              <select class="filter-select" id="filter-status" onchange="filterTenders()">
-                <option value="all">Barchasi</option>
-                <option value="active">Aktiv</option>
-                <option value="urgent">Shoshilinch</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label class="filter-label" for="filter-sort">Saralash</label>
-              <select class="filter-select" id="filter-sort" onchange="sortTenders(this.value, this)">
-                <option value="probability">G'alaba ehtimoli</option>
-                <option value="budget">Byudjet (katta)</option>
-                <option value="date">Muddati (yaqin)</option>
-                <option value="newest">Yangi qo'shilgan</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label class="filter-label" for="filter-search" data-i18n="filterSearch">Qidirish</label>
-              <input type="text" id="filter-search" class="filter-input" data-i18n-placeholder="filterSearch" placeholder="Qidirish" oninput="filterTenders()" />
-            </div>
-            <button class="btn-search" onclick="filterTenders()" data-i18n="btnSearch">Qidirish</button>
-            <button class="btn-ai-recommend" onclick="showModal('ai-recommend-modal')" title="AI Tender Tavsiyasi">🤖 AI Tavsiya</button>
-          </div>
-
-
-          <div class="results-header">
-            <span class="results-count" id="results-count">...</span>
-          </div>
-          <div class="tenders-grid" id="tenders-grid"><!-- injected by JS --></div>
-          <div id="pagination"></div>
+  <div class="wrap">
+    <div class="browse">
+      <!-- Filtrlar -->
+      <aside class="filters" aria-label="Filtrlar">
+        <div class="filter-group">
+          <h3>Soha</h3>
+          <div id="filter-sectors" class="filter-options-scroll"></div>
         </div>
-      </div>
 
-      <!-- ══ TAB 2: HUJJAT (7 ta O'zbekiston tender hujjati) ══ -->
-      <div class="tab-content" id="content-hujjat">
-        <div class="tab-inner">
-          <div class="hujjat-layout">
-            <div class="hujjat-form-panel" style="overflow-y:auto;max-height:calc(100vh - 180px)">
-              <h2 class="panel-title">⚡ AI Hujjat Generator <span style="font-size:12px;color:var(--accent);font-family:'JetBrains Mono',monospace">7 ta hujjat</span></h2>
-              
-              <div class="human-loop-warning compact" style="margin-bottom:16px">
-                <span>⚠️</span>
-                <span>AI hujjatni tayyorlaydi, lekin siz ALBATTA ko'rib chiqib, imzolashdan oldin tekshiring. Noto'g'ri ma'lumot uchun javobgarlik sizda.</span>
-              </div>
-
-              <form class="doc-form" id="doc-form" onsubmit="generateDocument(event)">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                  <div class="form-group">
-                    <label class="form-label" for="company-name">Kompaniya to'liq nomi</label>
-                    <input type="text" id="company-name" class="form-input" placeholder="Farand Group" required />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="org-form">Tashkiliy-huquqiy shakli</label>
-                    <input type="text" id="org-form" class="form-input" placeholder="MChJ" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="director-name">Rahbar F.I.SH</label>
-                    <input type="text" id="director-name" class="form-input" placeholder="Karimov Sardor Akmalovich" required />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="inn-number">INN raqami</label>
-                    <input type="text" id="inn-number" class="form-input" placeholder="302 456 789" />
-                  </div>
-                  <div class="form-group" style="grid-column:1/-1">
-                    <label class="form-label" for="legal-address">Yuridik manzil</label>
-                    <input type="text" id="legal-address" class="form-input" placeholder="Toshkent sh., Chilonzor t., 7-mavze, 21-uy" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="phone-email">Telefon / Email</label>
-                    <input type="text" id="phone-email" class="form-input" placeholder="+998 90 123 45 67 / info@farand.uz" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="experience">Tajriba yillari</label>
-                    <input type="number" id="experience" class="form-input" placeholder="5" required />
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="bank-details">Bank rekvizitlari</label>
-                  <textarea id="bank-details" class="form-input" rows="2" placeholder="XTBO Toshkent fil., MFO: 00873, H/R: 20208000..."  style="resize:vertical;min-height:50px"></textarea>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="past-projects">Shunga o'xshash loyihalar</label>
-                  <textarea id="past-projects" class="form-input" rows="2" placeholder="2024: Toshkent XTB e-ta'lim, 2023: DSQ analitika..."  style="resize:vertical;min-height:50px"></textarea>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                  <div class="form-group" style="grid-column:1/-1">
-                    <label class="form-label" for="tender-name">Tender nomi</label>
-                    <input type="text" id="tender-name" class="form-input" placeholder="Maktablar uchun elektron ta'lim platformasi" required />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="tender-lot">Tender raqami / LOT</label>
-                    <input type="text" id="tender-lot" class="form-input" placeholder="LOT-2026/04-IT" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="buyer-org">Buyurtmachi tashkilot</label>
-                    <input type="text" id="buyer-org" class="form-input" placeholder="Toshkent XTB" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="tender-price">Taklif narxi QQS bilan (so'm)</label>
-                    <input type="number" id="tender-price" class="form-input" placeholder="850000000" required />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="delivery-term">Bajarish muddati</label>
-                    <input type="text" id="delivery-term" class="form-input" placeholder="90 kalendar kun" />
-                  </div>
-                </div>
-                <input type="hidden" id="doc-tender-soha" />
-                <button type="submit" class="btn-generate" id="btn-generate" style="margin-top:12px">
-                  <span class="btn-generate-text">⚡ AI 7 ta Hujjat Yaratsin</span>
-                </button>
-              </form>
-            </div>
-
-            <div class="hujjat-output-panel" id="hujjat-output-panel">
-              <div class="output-placeholder" id="output-placeholder">
-                <div class="placeholder-icon">📄</div>
-                <h3 style="font-size:16px;margin-bottom:12px;color:var(--text)">7 ta rasmiy hujjat</h3>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:var(--text-2);max-width:350px;line-height:1.5;padding:10px;background:rgba(200,255,0,0.04);border-radius:6px;border-left:3px solid var(--accent)">
-                  <div>✓ Ariza</div>
-                  <div>✓ Kafolat xati</div>
-                  <div>✓ Kompaniya profili</div>
-                  <div>✓ Texnik taklif</div>
-                  <div>✓ Narx taklifi</div>
-                  <div>✓ Moliyaviy holat</div>
-                  <div style="grid-column:1/-1">✓ Vakolatnoma</div>
-                </div>
-                <p style="font-size:11px;color:var(--text-3);margin-top:10px;font-style:italic">O'zbekiston davlat xaridlari standartiga to'liq moslanadi</p>
-              </div>
-              <div class="doc-loading" id="doc-loading" style="display:none;">
-                <div class="loading-steps">
-                  <div class="loading-step" id="ls-1"><div class="ls-indicator"><div class="ls-spinner"></div></div><span>Ma'lumotlar tahlil qilinmoqda</span></div>
-                  <div class="loading-step dim" id="ls-2"><div class="ls-indicator"><div class="ls-spinner"></div></div><span>Ariza (Shakl 1) tayyorlanmoqda</span></div>
-                  <div class="loading-step dim" id="ls-3"><div class="ls-indicator"><div class="ls-spinner"></div></div><span>Kafolat xati (Shakl 2) yozilmoqda</span></div>
-                  <div class="loading-step dim" id="ls-4"><div class="ls-indicator"><div class="ls-spinner"></div></div><span>Texnik va narx taklifi rasmiylashtirilmoqda</span></div>
-                  <div class="loading-step dim" id="ls-5"><div class="ls-indicator"><div class="ls-spinner"></div></div><span>7 ta hujjat jamlanmoqda</span></div>
-                </div>
-              </div>
-              
-              <div class="generated-docs" id="generated-docs" style="display:none;">
-                <div class="doc-tabs" style="overflow-x:auto;flex-wrap:nowrap">
-                  <button type="button" class="doc-tab active" onclick="switchDocTab('ariza', this)" style="white-space:nowrap;font-size:11px">📋 Ariza</button>
-                  <button type="button" class="doc-tab" onclick="switchDocTab('kafolat', this)" style="white-space:nowrap;font-size:11px">🛡️ Kafolat</button>
-                  <button type="button" class="doc-tab" onclick="switchDocTab('kompaniya', this)" style="white-space:nowrap;font-size:11px">🏢 Profil</button>
-                  <button type="button" class="doc-tab" onclick="switchDocTab('texnik', this)" style="white-space:nowrap;font-size:11px">⚙️ Texnik</button>
-                  <button type="button" class="doc-tab" onclick="switchDocTab('narx', this)" style="white-space:nowrap;font-size:11px">💰 Narx</button>
-                  <button type="button" class="doc-tab" onclick="switchDocTab('moliya', this)" style="white-space:nowrap;font-size:11px">📊 Moliya</button>
-                  <button type="button" class="doc-tab" onclick="switchDocTab('vakolat', this)" style="white-space:nowrap;font-size:11px">📝 Vakolat</button>
-                </div>
-                
-                <div id="ai-model-label" style="padding:8px 20px;font-size:11px;color:var(--accent);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border)"></div>
-                
-                <div class="doc-output" id="doc-output-ariza"></div>
-                <div class="doc-output hidden" id="doc-output-kafolat"></div>
-                <div class="doc-output hidden" id="doc-output-kompaniya"></div>
-                <div class="doc-output hidden" id="doc-output-texnik"></div>
-                <div class="doc-output hidden" id="doc-output-narx"></div>
-                <div class="doc-output hidden" id="doc-output-moliya"></div>
-                <div class="doc-output hidden" id="doc-output-vakolat"></div>
-                
-                <div class="human-loop-warning compact" style="margin:12px 20px;border-radius:8px">
-                  <span>🔴</span>
-                  <span>Yuborishdan oldin ALBATTA tekshiring: narxlar, sanalar, imzolar va muhrlarni qo'ying</span>
-                </div>
-                
-                <div class="doc-actions">
-                  <button class="btn-download" onclick="exportDoc('word')">📥 Word (7 ta)</button>
-                  <button class="btn-download" onclick="exportDoc('pdf')">📥 PDF</button>
-                  <button class="btn-copy" onclick="copyDoc()">📋 Nusxalash</button>
-                  <button class="btn-restart" onclick="restartDoc()">↺ Qayta</button>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div class="filter-group">
+          <h3>Hudud</h3>
+          <label for="filter-region" class="visually-hidden">Hudud</label>
+          <select id="filter-region" class="select">
+            <option value="all">Barcha hududlar</option>
+          </select>
         </div>
-      </div>
 
-      <!-- ══ TAB 3: STRATEGIYA ══ -->
-      <div class="tab-content" id="content-strategiya">
-        <div class="tab-inner">
-          <div id="strategy-content"></div>
+        <div class="filter-group">
+          <h3>Holat</h3>
+          <label for="filter-status" class="visually-hidden">Holat</label>
+          <select id="filter-status" class="select">
+            <option value="active">Faol e'lonlar</option>
+            <option value="all">Barchasi</option>
+            <option value="urgent">Muddati yaqin</option>
+          </select>
         </div>
-      </div>
 
-      <!-- ══ TAB 4: SAQLANGAN ══ -->
-      <div class="tab-content" id="content-saved">
-        <div class="tab-inner">
-          <h2 class="panel-title" data-i18n="tabSaved">🏷️ Saqlangan Tenderlar</h2>
-          <div id="saved-tenders-list"></div>
-        </div>
-      </div>
+        <button type="button" class="filter-reset" id="filter-reset">Filtrlarni tozalash</button>
+      </aside>
 
-      <!-- ══ TAB 5: YUTGANLARIM ══ -->
-      <div class="tab-content" id="content-won">
-        <div class="tab-inner">
-          <h2 class="panel-title" style="color:var(--yellow)" data-i18n="tabWon">🏆 Yutgan Tenderlarim</h2>
-          <div id="won-tenders-list"></div>
-        </div>
-      </div>
-
-      <!-- ══ TAB 6: KABINET ══ -->
-      <div class="tab-content" id="content-cabinet">
-        <div class="tab-inner">
-          <h2 class="panel-title" data-i18n="cabTitle">👤 Shaxsiy Kabinet</h2>
-          <div class="cabinet-grid">
-            <div class="cabinet-card">
-              <h3 data-i18n="cabProfile">Kompaniya Profil</h3>
-              <div id="cab-profile-info" class="cab-info">...</div>
-            </div>
-            <div class="cabinet-card">
-              <h3 data-i18n="cabStats">Statistika</h3>
-              <div id="cab-stats-info" class="cab-info">
-                <div class="stat-line"><span>Saqlanganlar:</span> <b id="stat-saved">0</b></div>
-                <div class="stat-line"><span>Yutganlar:</span> <b id="stat-won" style="color:var(--yellow)">0</b></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Tarif holati va Telegram xabarnomasi -->
-          <div class="cabinet-grid" style="margin-top:20px">
-            <div class="cabinet-card" id="cab-billing"></div>
-            <div class="cabinet-card" id="cab-telegram"></div>
-          </div>
-
-          <!-- QO'SHIMCHA #8: Profil yangilash panel -->
-          <div class="cab-section" style="margin-top:24px">
-            <h4 class="cab-section-title" style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:12px">✏️ Profil Yangilash</h4>
-            <form onsubmit="updateProfile(event)" style="display:flex;flex-direction:column;gap:12px;max-width:400px">
-              <input type="text" id="update-name" class="form-input" placeholder="Ism Familiya" />
-              <input type="text" id="update-company" class="form-input" placeholder="Kompaniya nomi" />
-              <button type="submit" id="update-profile-btn" class="btn-primary" style="width:fit-content;padding:10px 24px">Saqlash</button>
-            </form>
-          </div>
-
-          <!-- QO'SHIMCHA #8: Parol o'zgartirish panel -->
-          <div class="cab-section" style="margin-top:32px">
-            <h4 class="cab-section-title" style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:12px">🔒 Parolni O'zgartirish</h4>
-            <form onsubmit="changePassword(event)" style="display:flex;flex-direction:column;gap:12px;max-width:400px">
-              <input type="password" id="current-password" class="form-input" placeholder="Joriy parol" required />
-              <input type="password" id="new-password" class="form-input" placeholder="Yangi parol (kamida 6 belgi)" required />
-              <input type="password" id="confirm-password" class="form-input" placeholder="Yangi parolni tasdiqlang" required />
-              <button type="submit" id="change-pwd-btn" class="btn-primary" style="width:fit-content;padding:10px 24px">O'zgartirish</button>
-            </form>
-          </div>
-
-        </div>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════════════ AUTH MODAL ═══ -->
-<div class="modal-overlay" id="auth-modal" onclick="if(event.target===this)hideModal('auth-modal')">
-  <div class="modal-box auth-modal-box">
-    <button class="modal-close-x" onclick="hideModal('auth-modal')">✕</button>
-    <div class="auth-modal-logo"><span class="logo-icon">⬡</span><span class="logo-text">TenderMind</span></div>
-    <div class="auth-tabs">
-      <button class="auth-tab active" id="auth-tab-login" onclick="switchAuthTab('login')" data-i18n="navLogIn">Kirish</button>
-      <button class="auth-tab" id="auth-tab-register" onclick="switchAuthTab('register')">Ro'yxatdan o'tish</button>
-    </div>
-
-    <form class="auth-form active" id="auth-form-login" onsubmit="doLogin(event)">
-      <div class="form-group"><input type="tel" id="login-phone" class="form-input" placeholder="+998 90 123 45 67" required /></div>
-      <div class="form-group"><input type="password" id="login-password" class="form-input" placeholder="••••••••" required /></div>
-      <button type="submit" class="btn-generate" id="login-btn" data-i18n="navLogIn">Kirish</button>
-    </form>
-
-    <form class="auth-form" id="auth-form-register" onsubmit="doRegister(event)">
-      <div class="form-group"><input type="text" id="reg-name" class="form-input" placeholder="Ism" required /></div>
-      <div class="form-group"><input type="tel" id="reg-phone" class="form-input" placeholder="+998 90 123 45 67" required /></div>
-      <div class="form-group"><input type="text" id="reg-company" class="form-input" placeholder="Kompaniya nomi" /></div>
-      <div class="form-group"><input type="password" id="reg-password" class="form-input" placeholder="Parol" minlength="6" required /></div>
-      <button type="submit" class="btn-generate" id="register-btn">Ro'yxatdan o'tish</button>
-    </form>
-  </div>
-</div>
-
-<!-- ═══════════════════════ TENDER DETAIL MODAL ═══ -->
-<div class="modal-overlay" id="tender-detail-modal" onclick="if(event.target===this)hideModal('tender-detail-modal')">
-  <div class="modal-box tender-modal-box">
-    <div class="modal-content"><!-- Injected by JS --></div>
-  </div>
-</div>
-
-<!-- ═══════════════════════ TENDER COMPARISON MODAL ═══ -->
-<div class="modal-overlay" id="tender-compare-modal" onclick="if(event.target===this)hideModal('tender-compare-modal')">
-  <div class="modal-box tender-modal-box" style="max-width:900px">
-    <div class="modal-content">
-      <div class="modal-header" style="padding:24px 28px 16px">
-        <h2 style="color:var(--text);font-size:1.4em;display:flex;align-items:center;gap:10px">
-          <span>⚖️</span> Tender Taqqoslash
-        </h2>
-        <button class="modal-close" onclick="hideModal('tender-compare-modal')">✕</button>
-      </div>
-      <div class="modal-body" id="tender-compare-body" style="padding:0 28px 28px">
-        <div id="compare-loading" style="text-align:center;padding:40px;display:none">
-          <div class="ls-spinner" style="width:40px;height:40px;border-width:3px;margin:0 auto 12px"></div>
-          <p style="color:var(--text-2)">Tenderlar taqqoslanmoqda...</p>
-        </div>
-        <div id="compare-result" style="display:none"></div>
-        <div id="compare-error" style="display:none;color:var(--red);padding:16px;background:rgba(255,77,77,0.1);border-radius:8px"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════════════ FLOATING AI CHAT ═══ -->
-<div id="ai-chat-fab" class="ai-chat-fab" onclick="toggleAIChat()">
-  <span class="fab-icon">🤖</span>
-  <span class="fab-pulse"></span>
-  <span class="fab-label">AI Maslahatchi</span>
-</div>
-
-<div id="ai-chat-window" class="ai-chat-window">
-  <div class="ai-chat-header">
-    <div class="ai-chat-header-left">
-      <div class="ai-avatar">🤖</div>
+      <!-- Natijalar -->
       <div>
-        <div class="ai-chat-title">AI Maslahatchi</div>
-        <div class="ai-chat-status"><span class="ai-dot pulsing"></span> Suhbat · tender va xaridlar</div>
-      </div>
-    </div>
-    <div class="ai-chat-header-right">
-      <button class="ai-chat-clear" onclick="clearChatHistory()" title="Yangi suhbat">🗑️</button>
-      <button class="ai-chat-close" onclick="toggleAIChat()">✕</button>
-    </div>
-  </div>
-  <div class="ai-chat-body" id="ai-chat-body">
-    <!-- Welcome message -->
-    <div class="ai-msg ai-msg-bot">
-      <div class="ai-msg-avatar">🤖</div>
-      <div class="ai-msg-bubble">
-        <b>Assalomu alaykum! 👋</b><br><br>
-        Men <b>AI maslahatchi</b>man — tenderlar, davlat xaridlari, hujjatlar va strategiya bo'yicha <b>har qanday savolga</b> javob berishga harakat qilaman (ChatGPT/Claude uslubida suhbat).<br><br>
-        • Yangi boshlovchisizmi? <i>«Tender nima, tushunmayman»</i> deb yozing — oddiy tilda tushuntiraman.<br>
-        • Ilovadagi tenderlarni tanlasangiz, shu e'lon bo'yicha chuqurroq gaplashamiz.<br><br>
-        <i>Enter — yuborish, Shift+Enter — yangi qator.</i>
-      </div>
-    </div>
-  </div>
-  <div class="ai-chat-suggestions" id="ai-chat-suggestions">
-    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Tender nima? Men tushunmayman, oddiy tilda tushuntirib ber')">❓ Tender nima?</button>
-    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Davlat xaridi va oddiy xarid o\'rtasida nima farq bor?')">⚖️ Farqi nima?</button>
-    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Menga mos tender qanday tanlash mumkin?')">🎯 Mos tender</button>
-    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Qatnashish uchun qanday hujjatlar kerak bo\'ladi?')">📝 Hujjatlar</button>
-    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('Narx taklifini qanday asoslash kerak?')">💰 Narx</button>
-    <button type="button" class="ai-suggestion-btn" onclick="sendAIChatSuggestion('xarid.uz portali haqida nimalarni bilishim kerak?')">🌐 xarid.uz</button>
-  </div>
-  <div class="ai-chat-footer">
-    <div class="ai-chat-context" id="ai-chat-context" style="display:none">
-      <span class="context-badge" id="ai-context-badge"></span>
-      <button onclick="clearChatContext()" class="context-clear">✕</button>
-    </div>
-    <form class="ai-chat-input-form" onsubmit="sendAIChat(event)">
-      <textarea id="ai-chat-input" class="ai-chat-input" rows="2" placeholder="Savolingizni yozing… (Enter — yuborish, Shift+Enter — yangi qator)" autocomplete="off"></textarea>
-      <button type="submit" class="ai-chat-send" id="ai-chat-send" title="Yuborish">➤</button>
-    </form>
-  </div>
-</div>
-
-<!-- ═══════════════════════ AI RECOMMEND MODAL ═══ -->
-<!-- ═══ HISOB-FAKTURA ═══════════════════════════════════════════════ -->
-<div class="modal-overlay" id="invoice-modal" onclick="if(event.target===this)hideModal('invoice-modal')">
-  <div class="modal-box invoice-box">
-    <div class="modal-content">
-      <div class="modal-header" style="padding:24px 28px 8px">
-        <h2 style="color:var(--text);font-size:1.25em">Hisob-faktura</h2>
-        <button class="modal-close" onclick="hideModal('invoice-modal')">✕</button>
-      </div>
-      <div class="modal-body" id="invoice-body" style="padding:0 28px 28px"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ BOSHLANG'ICH YO'RIQNOMA ═══════════════════════════════════════
-     Bilimi kam foydalanuvchilar uchun kirish nuqtasi. Ro'yxatdan
-     o'tmasdan ham to'liq o'qish mumkin. -->
-<div class="modal-overlay" id="guide-modal" onclick="if(event.target===this)hideModal('guide-modal')">
-  <div class="modal-box guide-box">
-    <div class="modal-content">
-      <div class="modal-header" style="padding:24px 28px 8px">
-        <h2 style="color:var(--text);font-size:1.3em;display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.1em">🎓</span> Birinchi tenderingiz
-        </h2>
-        <button class="modal-close" onclick="hideModal('guide-modal')">✕</button>
-      </div>
-      <div class="modal-body" id="guide-body" style="padding:0 28px 28px"></div>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="ai-recommend-modal" onclick="if(event.target===this)hideModal('ai-recommend-modal')">
-  <div class="modal-box tender-modal-box" style="max-width:800px">
-    <div class="modal-content">
-      <div class="modal-header" style="padding:24px 28px 16px">
-        <h2 style="color:var(--text);font-size:1.4em;display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.2em">🤖</span> AI Tender Tavsiyalari
-        </h2>
-        <button class="modal-close" onclick="hideModal('ai-recommend-modal')">✕</button>
-      </div>
-      <div class="modal-body" id="ai-recommend-body" style="padding:0 28px 28px">
-        <div class="ai-recommend-form">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-            <div class="form-group">
-              <label class="form-label">Kompaniya nomi</label>
-              <input type="text" id="rec-company" class="form-input" placeholder="Farand LLC" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Tajriba (yil)</label>
-              <input type="number" id="rec-experience" class="form-input" placeholder="5" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Soha</label>
-              <select id="rec-soha" class="filter-select">
-                <option value="all">Barchasi</option>
-                <option value="it">IT</option>
-                <option value="qurilish">Qurilish</option>
-                <option value="tibbiyot">Tibbiyot</option>
-                <option value="oziq">Oziq-ovqat</option>
-                <option value="transport">Transport</option>
-                <option value="talim">Ta'lim</option>
-                <option value="ekologiya">Ekologiya</option>
-                <option value="qishloq">Qishloq xo'jaligi</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Hudud</label>
-              <select id="rec-hudud" class="filter-select">
-                <option value="all">Barchasi</option>
-                <option value="toshkent">Toshkent</option>
-                <option value="samarqand">Samarqand</option>
-                <option value="namangan">Namangan</option>
-                <option value="andijon">Andijon</option>
-                <option value="fargona">Farg'ona</option>
-                <option value="buxoro">Buxoro</option>
-                <option value="qashqadaryo">Qashqadaryo</option>
-              </select>
-            </div>
+        <div class="results-head">
+          <p class="results-count" id="results-count">Yuklanmoqda…</p>
+          <div class="sort">
+            <label for="sort-select">Saralash</label>
+            <select id="sort-select" class="select">
+              <option value="newest">Yangi e'lonlar</option>
+              <option value="date">Muddati yaqin</option>
+              <option value="budget">Katta byudjet</option>
+            </select>
           </div>
-          <button class="btn-generate" onclick="getAIRecommendations()" id="btn-ai-recommend" style="width:100%">
-            🤖 AI Tavsiya Olish
-          </button>
         </div>
-        <div id="ai-recommend-results"></div>
+
+        <div id="results" role="list"></div>
+        <nav class="pagination" id="pagination" aria-label="Sahifalar"></nav>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ HUJJATLAR ═════════════════════════════════════════════════ -->
+<section class="view" id="view-docs">
+  <div class="wrap-narrow">
+    <div class="section-head">
+      <h2>Hujjatlarni tayyorlash</h2>
+      <p>
+        Kompaniya va lot ma'lumotlarini kiriting — tender uchun kerak bo'ladigan
+        7 ta shakl tayyorlanadi. Yuborishdan oldin har birini o'zingiz tekshiring.
+      </p>
+    </div>
+
+    <form id="doc-form">
+      <div class="panel">
+        <div class="panel-head"><h3>Kompaniya</h3></div>
+        <div class="grid-2">
+          <div class="field">
+            <label class="field-label" for="d-company">Kompaniya nomi *</label>
+            <input id="d-company" name="company" class="input" required placeholder="Masalan: Farand MChJ">
+          </div>
+          <div class="field">
+            <label class="field-label" for="d-orgForm">Tashkiliy shakl</label>
+            <input id="d-orgForm" name="orgForm" class="input" placeholder="MChJ">
+          </div>
+          <div class="field">
+            <label class="field-label" for="d-director">Rahbar</label>
+            <input id="d-director" name="director" class="input" placeholder="F.I.O.">
+          </div>
+          <div class="field">
+            <label class="field-label" for="d-inn">STIR (INN)</label>
+            <input id="d-inn" name="inn" class="input" inputmode="numeric" placeholder="123456789">
+          </div>
+          <div class="field">
+            <label class="field-label" for="d-experience">Tajriba (yil) *</label>
+            <input id="d-experience" name="experience" class="input" type="number" min="0" max="99" required placeholder="5">
+          </div>
+          <div class="field">
+            <label class="field-label" for="d-phoneEmail">Aloqa</label>
+            <input id="d-phoneEmail" name="phoneEmail" class="input" placeholder="+998 90 123 45 67">
+          </div>
+          <div class="field" style="grid-column: 1 / -1">
+            <label class="field-label" for="d-address">Manzil</label>
+            <input id="d-address" name="address" class="input">
+          </div>
+          <div class="field" style="grid-column: 1 / -1">
+            <label class="field-label" for="d-pastProjects">Avvalgi loyihalar</label>
+            <textarea id="d-pastProjects" name="pastProjects" class="textarea"
+                      placeholder="Qisqacha: qayerda, nima qilgansiz, qachon"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Lot</h3></div>
+        <div class="grid-2">
+          <div class="field" style="grid-column: 1 / -1">
+            <label class="field-label" for="d-tenderName">Lot yoki tender nomi *</label>
+            <input id="d-tenderName" name="tenderName" class="input" required>
+          </div>
+          <div class="field">
+            <label class="field-label" for="d-tenderLot">Lot raqami</label>
+            <input id="d-tenderLot" name="tenderLot" class="input" placeholder="1">
+          </div>
+          <div class="field">
+            <label class="field-label" for="d-buyerOrg">Buyurtmachi</label>
+            <input id="d-buyerOrg" name="buyerOrg" class="input">
+          </div>
+          <div class="field">
+            <label class="field-label" for="d-price">Taklif narxi (so'm) *</label>
+            <input id="d-price" name="price" class="input" type="number" min="1" required placeholder="270000000">
+          </div>
+          <div class="field">
+            <label class="field-label" for="d-deliveryTerm">Bajarish muddati</label>
+            <input id="d-deliveryTerm" name="deliveryTerm" class="input" placeholder="90 kalendar kun">
+          </div>
+        </div>
+        <p class="field-error" id="doc-error"></p>
+        <button type="submit" class="btn btn-primary btn-lg" id="doc-submit" style="margin-top: var(--s4)">
+          7 ta hujjatni tayyorlash
+        </button>
+      </div>
+    </form>
+
+    <div id="doc-result" hidden></div>
+  </div>
+</section>
+
+<!-- ══ MENING ISHIM ══════════════════════════════════════════════ -->
+<section class="view" id="view-work">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Mening ishim</h2>
+      <p>Saqlagan lotlaringiz va yutgan tenderlaringiz.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Saqlanganlar</h3>
+        <button type="button" class="btn btn-secondary btn-sm" id="compare-btn" hidden>Ikkitasini solishtirish</button>
+      </div>
+      <div id="saved-list"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Yutganlarim</h3></div>
+      <div id="won-list"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SOZLAMALAR ════════════════════════════════════════════════ -->
+<section class="view" id="view-account">
+  <div class="wrap-narrow">
+    <div class="section-head">
+      <h2>Sozlamalar</h2>
+    </div>
+
+    <div class="panel" id="panel-plan"></div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Profil</h3></div>
+      <form id="profile-form" class="grid-2">
+        <div class="field">
+          <label class="field-label" for="p-name">Ism</label>
+          <input id="p-name" name="name" class="input">
+        </div>
+        <div class="field">
+          <label class="field-label" for="p-company">Kompaniya</label>
+          <input id="p-company" name="company" class="input">
+        </div>
+        <div style="grid-column: 1 / -1">
+          <button type="submit" class="btn btn-primary">Saqlash</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel" id="panel-telegram"></div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Parolni o'zgartirish</h3></div>
+      <form id="password-form" class="grid-2">
+        <div class="field">
+          <label class="field-label" for="p-current">Joriy parol</label>
+          <input id="p-current" name="currentPassword" class="input" type="password" autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label class="field-label" for="p-new">Yangi parol</label>
+          <input id="p-new" name="newPassword" class="input" type="password" autocomplete="new-password">
+        </div>
+        <div style="grid-column: 1 / -1">
+          <p class="field-error" id="password-error"></p>
+          <button type="submit" class="btn btn-primary">O'zgartirish</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ══ QO'LLANMA ═════════════════════════════════════════════════ -->
+<section class="view" id="view-guide">
+  <div class="wrap-narrow">
+    <div class="section-head">
+      <h2>Birinchi tenderingiz</h2>
+      <p>
+        Tender haqida hech narsa bilmasangiz ham — shu yerdan boshlang.
+        Har bir qadam bitta savolga javob beradi.
+      </p>
+    </div>
+
+    <div class="steps" id="steps"></div>
+
+    <div class="section-head" style="margin-top: var(--s8)">
+      <h2>Atamalar</h2>
+      <p>Notanish so'zga duch kelsangiz — shu yerdan qarang.</p>
+    </div>
+    <div id="glossary-list"></div>
+  </div>
+</section>
+
+<!-- ══ NARXLAR ═══════════════════════════════════════════════════ -->
+<section class="view" id="view-plans">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Tariflar</h2>
+      <p>Tenderlarni ko'rish va lotlarni tushunish — har doim bepul.
+         Pullik tarif faqat AI hujjat va maslahat limitini kengaytiradi.</p>
+    </div>
+    <div class="plans" id="plans"></div>
+    <p class="small muted" id="plans-note" style="margin-top: var(--s5)"></p>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-row">
+      <span>© 2026 TenderMind</span>
+      <span>AI tayyorlagan matnlar insoniy tekshiruvni talab qiladi.</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ══ Mobil navigatsiya ═════════════════════════════════════════ -->
+<nav class="mobilenav" aria-label="Asosiy (mobil)">
+  <ul class="mobilenav-list">
+    <li style="flex:1"><a href="#" class="mobilenav-link" data-go="browse" aria-current="page">
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.7"/><path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      Tenderlar</a></li>
+    <li style="flex:1"><a href="#" class="mobilenav-link" data-go="docs">
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 2.5h6l4 4v11H5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M11 2.5v4h4" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+      Hujjatlar</a></li>
+    <li style="flex:1"><a href="#" class="mobilenav-link" data-go="guide">
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.7"/><path d="M7.8 7.6a2.2 2.2 0 114 1.3c-.6.7-1.3 1-1.3 1.9M10 14.2h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      Qo'llanma</a></li>
+    <li style="flex:1"><a href="#" class="mobilenav-link" data-go="work">
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 6.5h14v10H3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7.5 6.5v-2h5v2" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+      Ishim</a></li>
+  </ul>
+</nav>
+
+<!-- ══ Kirish oynasi ═════════════════════════════════════════════ -->
+<div class="modal" id="auth-modal" hidden role="dialog" aria-modal="true" aria-labelledby="auth-title">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="auth-title">Hisobingizga kiring</h2>
+      <button type="button" class="icon-btn" data-close="auth-modal" aria-label="Yopish">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab" role="tab" aria-selected="true" data-auth-tab="login">Kirish</button>
+        <button type="button" class="tab" role="tab" aria-selected="false" data-auth-tab="register">Ro'yxatdan o'tish</button>
+      </div>
+
+      <form id="login-form">
+        <div class="field" style="margin-bottom: var(--s3)">
+          <label class="field-label" for="l-phone">Telefon</label>
+          <input id="l-phone" name="phone" class="input" type="tel" required
+                 placeholder="+998 90 123 45 67" autocomplete="tel">
+        </div>
+        <div class="field" style="margin-bottom: var(--s2)">
+          <label class="field-label" for="l-password">Parol</label>
+          <input id="l-password" name="password" class="input" type="password" required autocomplete="current-password">
+        </div>
+        <p class="field-error" id="login-error"></p>
+        <button type="submit" class="btn btn-primary btn-block btn-lg">Kirish</button>
+      </form>
+
+      <form id="register-form" hidden>
+        <div class="field" style="margin-bottom: var(--s3)">
+          <label class="field-label" for="r-name">Ism</label>
+          <input id="r-name" name="name" class="input" required autocomplete="name">
+        </div>
+        <div class="field" style="margin-bottom: var(--s3)">
+          <label class="field-label" for="r-phone">Telefon</label>
+          <input id="r-phone" name="phone" class="input" type="tel" required
+                 placeholder="+998 90 123 45 67" autocomplete="tel">
+        </div>
+        <div class="field" style="margin-bottom: var(--s3)">
+          <label class="field-label" for="r-company">Kompaniya</label>
+          <input id="r-company" name="company" class="input" placeholder="Ixtiyoriy">
+        </div>
+        <div class="field" style="margin-bottom: var(--s2)">
+          <label class="field-label" for="r-password">Parol</label>
+          <input id="r-password" name="password" class="input" type="password" required
+                 minlength="6" autocomplete="new-password">
+        </div>
+        <p class="field-error" id="register-error"></p>
+        <button type="submit" class="btn btn-primary btn-block btn-lg">Ro'yxatdan o'tish</button>
+      </form>
     </div>
   </div>
 </div>
 
-<!-- TOAST CONTAINER -->
-<div id="toast-container"></div>
+<!-- ══ Umumiy oyna (hisob-faktura, solishtirish, tavsiya) ════════ -->
+<div class="modal" id="info-modal" hidden role="dialog" aria-modal="true" aria-labelledby="info-title">
+  <div class="modal-box is-wide">
+    <div class="modal-head">
+      <h2 id="info-title">—</h2>
+      <button type="button" class="icon-btn" data-close="info-modal" aria-label="Yopish">✕</button>
+    </div>
+    <div class="modal-body" id="info-body"></div>
+  </div>
+</div>
 
-<script src="i18n.js"></script>
-<script src="app.js"></script>
-<script>
-  // Initialize i18n after all scripts loaded
-  document.addEventListener('DOMContentLoaded', () => {
-    const savedLang = localStorage.getItem('tm_lang') || 'uz';
-    if(typeof setLang === 'function') setLang(savedLang);
-  });
-</script>
+<!-- ══ AI maslahatchi ════════════════════════════════════════════ -->
+<button type="button" class="chat-toggle" id="chat-toggle">
+  <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <path d="M3 5.5A2.5 2.5 0 015.5 3h9A2.5 2.5 0 0117 5.5v6a2.5 2.5 0 01-2.5 2.5H8l-4 3.5v-3.5H5.5A2.5 2.5 0 013 11.5z"
+          stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+  </svg>
+  Savolingiz bormi?
+</button>
+
+<div class="chat" id="chat" hidden role="dialog" aria-label="AI maslahatchi">
+  <div class="chat-head">
+    <h3>AI maslahatchi</h3>
+    <div style="display:flex;gap:2px">
+      <button type="button" class="icon-btn" id="chat-clear" aria-label="Suhbatni tozalash" title="Tozalash">⟲</button>
+      <button type="button" class="icon-btn" id="chat-close" aria-label="Yopish">✕</button>
+    </div>
+  </div>
+  <div class="chat-body" id="chat-body"></div>
+  <form class="chat-foot" id="chat-form">
+    <label for="chat-input" class="visually-hidden">Savolingiz</label>
+    <textarea id="chat-input" class="textarea" rows="1" placeholder="Savolingizni yozing…"></textarea>
+    <button type="submit" class="btn btn-primary" id="chat-send" aria-label="Yuborish">→</button>
+  </form>
+</div>
+
+<!-- ══ Atama izohi ═══════════════════════════════════════════════ -->
+<div class="term-pop" id="term-pop" hidden role="tooltip"></div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="/assets/js/app.js" type="module"></script>
 </body>
 </html>

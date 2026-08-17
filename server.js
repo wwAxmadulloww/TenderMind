@@ -54,13 +54,12 @@ app.use(cors(corsOptions()));
 app.use(express.json({ limit: '2mb' }));
 
 // Static file serving for client files
-app.use('/styles.css', express.static(path.join(__dirname, 'styles.css')));
-app.use('/app.js', express.static(path.join(__dirname, 'app.js')));
-app.use('/i18n.js', express.static(path.join(__dirname, 'i18n.js')));
-app.use('/logo.png', express.static(path.join(__dirname, 'logo.png')));
-app.use('/favicon.ico', express.static(path.join(__dirname, 'logo.png')));
-
-app.use('/admin.js', express.static(path.join(__dirname, 'admin.js')));
+// Frontend fayllari. Productionda uzoq kesh — fayl nomi o'zgarmasa
+// brauzer qayta yuklamaydi; deploy paytida `?v=` qo'shish yetarli.
+app.use('/assets', express.static(path.join(__dirname, 'assets'), {
+  maxAge: isProd ? '7d' : 0,
+  etag: true,
+}));
 
 // Serve Frontend Landing & SPA page
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
