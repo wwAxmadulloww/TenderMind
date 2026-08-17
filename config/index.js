@@ -4,7 +4,7 @@ require('dotenv').config();
 
 const env = process.env.NODE_ENV || 'development';
 const isProd = env === 'production';
-const port = Number(process.env.PORT) || 3001;
+const port = Number(process.env.PORT) || 3002;
 
 const splitCsv = (value) => String(value || '')
   .split(',')
@@ -15,7 +15,9 @@ const config = {
   env,
   isProd,
   port,
-  host: process.env.HOST || '127.0.0.1',
+  // Productionda (Render/Docker) konteyner tashqarisidan ko'rinishi uchun
+  // 0.0.0.0 ga bind qilish shart; lokalda 127.0.0.1 xavfsizroq.
+  host: process.env.HOST || (isProd ? '0.0.0.0' : '127.0.0.1'),
   jwtSecret: String(process.env.JWT_SECRET || '').trim(),
   mongodbUri: String(process.env.MONGODB_URI || '').trim(),
   frontendUrl: String(process.env.FRONTEND_URL || '').trim(),

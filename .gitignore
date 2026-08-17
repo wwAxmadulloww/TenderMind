@@ -24,3 +24,6 @@ logs/
 # Build fayllari (agar kerak bo'lsa)
 dist/
 build/
+
+# Build artifacts / zip
+*.zip

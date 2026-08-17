@@ -1,21 +1,31 @@
 #!/bin/bash
-# TenderMind AI Gemini - To'liq qayta ishga tushirish
+# TenderMind — serverni qayta ishga tushirish
+#
+# DIQQAT: bu faylga HECH QACHON API kalit yoki JWT secret yozmang.
+# Barcha maxfiy qiymatlar .env faylida saqlanadi (.env git ga tushmaydi).
+
+set -e
+
+cd "$(dirname "$0")"
+
+if [ ! -f .env ]; then
+  echo "❌ .env fayli topilmadi. Avval quyidagini bajaring:"
+  echo "   cp .env.example .env  &&  qiymatlarni to'ldiring"
+  exit 1
+fi
+
+# .env dagi PORT ni o'qish (topilmasa 3002)
+PORT=$(grep -E '^PORT=' .env | tail -n1 | cut -d'=' -f2 | tr -d ' \r')
+PORT=${PORT:-3002}
 
 echo "================================================"
-echo "  TenderMind — Gemini AI Restart Script"
+echo "  TenderMind — Restart"
 echo "================================================"
 echo ""
-echo "🛑 Barcha Node.js serverlarni o'chirish..."
-killall node 2>/dev/null
-sleep 2
+echo "🛑 $PORT portidagi eski jarayonni to'xtatish..."
+lsof -ti tcp:"$PORT" | xargs kill -9 2>/dev/null || true
+sleep 1
 
-echo "✅ Barcha serverlar to'xtatildi"
+echo "🚀 Server ishga tushmoqda — http://localhost:$PORT"
 echo ""
-echo "🚀 Port 3000 da yangi Gemini server ishga tushmoqda..."
-echo ""
-
-cd /Users/axmadullo/TenderMInd
-GEMINI_API_KEY=AIzaSyB6msmY1FyyfClVuKf1VmXQQiTKPUkoqkc \
-JWT_SECRET=tendermind-super-secret-key-change-in-production \
-PORT=3000 \
-node server.js
+exec node server.js

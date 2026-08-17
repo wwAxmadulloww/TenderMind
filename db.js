@@ -28,6 +28,26 @@ const UserSchema = new mongoose.Schema({
   aiDocResetDate: { type: String, default: '' }, // YYYY-MM-DD
   aiChatUsedToday: { type: Number, default: 0 },
   aiChatResetDate: { type: String, default: '' },
+  // Telegram orqali xabarnoma
+  telegram: {
+    chatId: { type: String, default: '', index: true },
+    username: { type: String, default: '' },
+    linkCode: { type: String, default: '', index: true },   // hisobni bog'lash kodi
+    linkedAt: { type: Date, default: null },
+    notifyEnabled: { type: Boolean, default: true },
+    filters: {
+      soha: { type: String, default: 'all' },
+      hudud: { type: String, default: 'all' },
+      minBudget: { type: Number, default: 0 },
+    },
+    lastNotifiedAt: { type: Date, default: null },
+  },
+  // "Birinchi tenderingiz" yo'riqnomasi bo'yicha progress
+  onboarding: {
+    completedSteps: { type: [String], default: [] },
+    finishedAt: { type: Date, default: null },
+    skipped: { type: Boolean, default: false },
+  },
   createdAt: { type: Date, default: Date.now },
   lastLoginAt: { type: Date, default: null }
 });
@@ -49,25 +69,48 @@ UserSchema.methods.isPlanActive = function () {
   return new Date() < new Date(this.planExpiresAt);
 };
 
-// Bugungi AI doc limit
-UserSchema.methods.canUseAIDoc = function () {
-  const today = new Date().toISOString().slice(0, 10);
-  if (this.aiDocResetDate !== today) return true; // yangi kun — reset
-  const limits = this.getPlanLimits();
-  return this.aiDocUsedToday < limits.docPerDay;
+// Kunlik limit maydonlari: 'doc' va 'chat' uchun
+const QUOTA_FIELDS = {
+  doc:  { used: 'aiDocUsedToday',  reset: 'aiDocResetDate',  limit: 'docPerDay'  },
+  chat: { used: 'aiChatUsedToday', reset: 'aiChatResetDate', limit: 'chatPerDay' },
 };
 
-// AI doc ishlatildi
-UserSchema.methods.incrementAIDoc = async function () {
-  const today = new Date().toISOString().slice(0, 10);
-  if (this.aiDocResetDate !== today) {
-    this.aiDocUsedToday = 1;
-    this.aiDocResetDate = today;
+const today = () => new Date().toISOString().slice(0, 10);
+
+// Bugun shu turdagi amaldan nechtasi ishlatilgan
+UserSchema.methods.quotaUsed = function (kind) {
+  const f = QUOTA_FIELDS[kind];
+  if (!f) return 0;
+  return this[f.reset] === today() ? this[f.used] : 0;   // yangi kun — reset
+};
+
+// Limit yetarlimi?
+UserSchema.methods.canUse = function (kind) {
+  const f = QUOTA_FIELDS[kind];
+  if (!f) return true;
+  // Pullik tarif muddati tugagan bo'lsa — free limitlari qo'llanadi
+  const limits = this.isPlanActive()
+    ? this.getPlanLimits()
+    : { docPerDay: 1, chatPerDay: 10 };
+  return this.quotaUsed(kind) < limits[f.limit];
+};
+
+// Limitdan bittasini sarflash
+UserSchema.methods.consumeQuota = async function (kind) {
+  const f = QUOTA_FIELDS[kind];
+  if (!f) return;
+  if (this[f.reset] !== today()) {
+    this[f.used] = 1;
+    this[f.reset] = today();
   } else {
-    this.aiDocUsedToday += 1;
+    this[f.used] += 1;
   }
   await this.save();
 };
+
+// Eski nomlar — mavjud kod buzilmasligi uchun
+UserSchema.methods.canUseAIDoc = function () { return this.canUse('doc'); };
+UserSchema.methods.incrementAIDoc = function () { return this.consumeQuota('doc'); };
 
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
 
@@ -81,8 +124,11 @@ const TenderSchema = new mongoose.Schema({
   title: { type: String, required: true },
   budget: { type: String, required: true },
   budgetRaw: { type: Number, required: true },
-  probability: { type: Number, default: 50 },
-  competitors: { type: Number, default: 5 },
+  // Bu ikkalasi HISOBLANGAN emas — faqat manba ularni bersa to'ldiriladi.
+  // Demo yozuvlarda qo'lda kiritilgan, haqiqiy e'lonlarda odatda null.
+  // null bo'lsa interfeys ularni umuman ko'rsatmaydi (soxta raqam chiqmaydi).
+  probability: { type: Number, default: null },
+  competitors: { type: Number, default: null },
   deadline: { type: String, required: true },
   postedDate: { type: String, default: () => new Date().toISOString().slice(0, 10) },
   tags: { type: [String], default: [] },
@@ -91,10 +137,16 @@ const TenderSchema = new mongoose.Schema({
   requirements: { type: [String], default: [] },
   contactEmail: { type: String, default: '' },
   contactPhone: { type: String, default: '' },
-  // xarid.uz integratsiya uchun
+  // Tashqi manba (ingestion) uchun
   sourceUrl: { type: String, default: '' },
-  sourceId: { type: String, default: '' },
+  sourceId: { type: String, default: '', index: true },
+  sourceName: { type: String, default: '' },      // masalan: 'xarid.uz'
+  contentHash: { type: String, default: '', index: true },  // o'zgarishni aniqlash uchun
   isVerified: { type: Boolean, default: false },
+  // isDemo — namunaviy (o'qitish uchun) yozuv. Haqiqiy e'lon EMAS.
+  // Foydalanuvchi buni interfeysda aniq ko'rishi shart.
+  isDemo: { type: Boolean, default: false, index: true },
+  lotCount: { type: Number, default: 0 },
   // Admin
   createdBy: { type: String, default: 'admin' },
   createdAt: { type: Date, default: Date.now },
@@ -125,12 +177,89 @@ TenderSchema.index({ title: 'text', description: 'text', org: 'text' });
 TenderSchema.index({ status: 1, soha: 1, hudud: 1 });
 TenderSchema.index({ deadline: 1 });
 
-TenderSchema.pre('save', function (next) {
+// Mongoose 9 da middleware ga `next` callback uzatilmaydi — hook sinxron
+// bo'lishi yoki promise qaytarishi kerak. Eski `function (next) { next(); }`
+// ko'rinishi "next is not a function" xatosini beradi va SAQLASHNI buzadi.
+TenderSchema.pre('save', function () {
   this.updatedAt = new Date();
-  next();
 });
 
 const Tender = mongoose.models.Tender || mongoose.model('Tender', TenderSchema);
+
+// ── LOT MODEL ─────────────────────────────────────────────
+// Bitta tender ichida bir nechta lot bo'lishi mumkin — real xarid
+// e'lonlarida ishtirokchi aynan LOT ga taklif beradi, tenderga emas.
+const LotSchema = new mongoose.Schema({
+  id: { type: String, default: uuidv4, unique: true, index: true },
+  tenderId: { type: String, required: true, index: true },
+
+  lotNumber: { type: Number, required: true },
+  title: { type: String, required: true },
+  description: { type: String, default: '' },
+
+  // Nima va qancha sotib olinmoqda
+  quantity: { type: Number, default: null },
+  unit: { type: String, default: '' },              // dona, kg, m², xizmat
+  startPrice: { type: Number, required: true },     // boshlang'ich narx, so'm
+  currency: { type: String, default: 'UZS' },
+
+  // Shartlar
+  deliveryTerm: { type: String, default: '' },
+  deliveryAddress: { type: String, default: '' },
+  requirements: { type: [String], default: [] },
+  deadline: { type: String, required: true },
+
+  status: { type: String, enum: ['active', 'urgent', 'closed', 'canceled'], default: 'active' },
+
+  // Tashqi manba
+  sourceUrl: { type: String, default: '' },
+  sourceId: { type: String, default: '', index: true },
+  isDemo: { type: Boolean, default: false },
+
+  // ── ODDIY TILDA TUSHUNTIRISH ───────────────────────────
+  // AI bir marta yaratadi va shu yerda saqlanadi. Har ko'rishda qayta
+  // generatsiya qilinmaydi — aks holda har bir sahifa ochilishi pul turadi.
+  explanation: {
+    nima: { type: String, default: '' },          // nima sotib olinmoqda
+    kim: { type: String, default: '' },           // kim qatnasha oladi
+    hujjatlar: { type: [String], default: [] },   // qanday hujjat kerak
+    pul: { type: String, default: '' },           // qancha pul, qanday to'lanadi
+    muddat: { type: String, default: '' },        // qachongacha
+    xulosa: { type: String, default: '' },        // 2-3 jumlalik umumiy xulosa
+    generatedAt: { type: Date, default: null },
+    model: { type: String, default: '' },
+  },
+
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+}, {
+  toJSON: { virtuals: true, transform: stripInternals },
+  toObject: { virtuals: true, transform: stripInternals },
+});
+
+function stripInternals(_doc, ret) {
+  delete ret._id;
+  delete ret.__v;
+  return ret;
+}
+
+LotSchema.index({ tenderId: 1, lotNumber: 1 });
+LotSchema.index({ status: 1, deadline: 1 });
+LotSchema.index({ title: 'text', description: 'text' });
+
+// Tushuntirish tayyor va yangimi? (30 kundan eski bo'lsa qayta yaratiladi)
+LotSchema.methods.hasExplanation = function () {
+  const generatedAt = this.explanation && this.explanation.generatedAt;
+  if (!generatedAt) return false;
+  const ageInDays = (Date.now() - new Date(generatedAt).getTime()) / 86400000;
+  return ageInDays < 30 && Boolean(this.explanation.xulosa);
+};
+
+LotSchema.pre('save', function () {
+  this.updatedAt = new Date();
+});
+
+const Lot = mongoose.models.Lot || mongoose.model('Lot', LotSchema);
 
 // ── SUBSCRIPTION MODEL ────────────────────────────────────
 const SubscriptionSchema = new mongoose.Schema({
@@ -190,4 +319,4 @@ const connectDB = async (options = {}) => {
 
 const isDBConnected = () => mongoose.connection.readyState === 1;
 
-module.exports = { connectDB, isDBConnected, User, Tender, Subscription, mongoose };
+module.exports = { connectDB, isDBConnected, User, Tender, Lot, Subscription, mongoose };

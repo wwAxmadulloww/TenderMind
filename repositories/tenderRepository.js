@@ -10,6 +10,15 @@ function normalizeTender(tender) {
   delete obj.isFresh;
   delete obj._id;
   delete obj.__v;
+
+  // `probability` va `competitors` — demo yozuvlarda hisoblangan emas,
+  // qo'lda kiritilgan qiymatlar. Mijoz ularni fakt sifatida ko'rsatmasligi
+  // uchun ochiq belgi qo'yiladi.
+  obj.isDemo = Boolean(obj.isDemo);
+  obj.estimatesAreDemo = obj.isDemo;
+  if (obj.isDemo) {
+    obj.dataNote = 'Namunaviy ma\'lumot — o\'rganish uchun. Haqiqiy e\'lon emas.';
+  }
   return obj;
 }
 
@@ -35,15 +44,52 @@ function buildSort(sort) {
   if (sort === 'budget') return { budgetRaw: -1 };
   if (sort === 'date') return { deadline: 1 };
   if (sort === 'newest') return { postedDate: -1 };
-  return { probability: -1 };
+  // probability haqiqiy e'lonlarda null bo'ladi — bunday yozuvlar oxirida
+  // qolmasligi uchun ikkinchi mezon sifatida e'lon sanasi ishlatiladi.
+  return { probability: -1, postedDate: -1 };
+}
+
+const DAY_MS = 86400000;
+const toISODate = (date) => new Date(date).toISOString().slice(0, 10);
+
+/**
+ * Demo sanalarini bugungi kunga surish.
+ *
+ * Seed faylidagi sanalar qat'iy yozilgan, shuning uchun vaqt o'tishi bilan
+ * hamma demo tender "muddati tugagan" holatga tushib qoladi va ilova
+ * bo'sh ko'rinadi. Bu yerda eng erta e'lon sanasi "bugun" deb olinadi va
+ * qolgan barcha sanalar shu farq bo'yicha suriladi — nisbiy tartib va
+ * shoshilinchlik saqlanadi.
+ */
+function shiftSeedDates(seed) {
+  const posted = seed
+    .map(t => new Date(t.postedDate).getTime())
+    .filter(ms => Number.isFinite(ms));
+  if (!posted.length) return seed;
+
+  const earliest = Math.min(...posted);
+  const offset = Date.now() - earliest;
+  if (offset <= 0) return seed;   // sanalar allaqachon kelajakda
+
+  return seed.map(t => ({
+    ...t,
+    postedDate: toISODate(new Date(t.postedDate).getTime() + offset),
+    deadline: toISODate(new Date(t.deadline).getTime() + offset),
+  }));
 }
 
 async function ensureSeeded() {
   const count = await Tender.countDocuments();
   if (count > 0) return count;
-  const docs = TENDERS_SEED.map(t => ({
+  const docs = shiftSeedDates(TENDERS_SEED).map(t => ({
     ...t,
     isFresh: Boolean(t.isFresh || t.isNew),
+    // Seed ma'lumoti — namunaviy, haqiqiy e'lon emas. Interfeys buni
+    // ochiq ko'rsatadi; haqiqiy ingestion ishga tushganda yangi
+    // yozuvlarda isDemo=false bo'ladi.
+    isDemo: true,
+    isVerified: false,
+    sourceName: 'demo',
   }));
   await Tender.insertMany(docs, { ordered: false });
   return docs.length;
@@ -87,6 +133,7 @@ async function count() {
 
 module.exports = {
   ensureSeeded,
+  shiftSeedDates,
   list,
   findById,
   findManyByIds,

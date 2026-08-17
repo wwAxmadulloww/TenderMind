@@ -1,0 +1,347 @@
+/* ═══════════════════════════════════════════════════════════════════
+   TENDERMIND — DIZAYN TIZIMI
+   ───────────────────────────────────────────────────────────────────
+   Yo'nalish: rasmiy hujjat. Oq qog'oz, muhr siyohi ko'k, ma'lumot
+   uchun mono shrift. Uch xil ovoz — uch xil shrift:
+
+     Sans  → interfeys va rasmiy ma'lumot
+     Mono  → raqamlar, muddatlar, hujjat raqamlari
+     Serif → "oddiy tilda" tushuntirish (odam tilida yozilgan izoh)
+
+   Serifdan faqat tushuntirish panellarida foydalaniladi. Bu tasodifiy
+   emas: rasmiy hujjat va uni tushuntirayotgan odam — ikki xil ovoz,
+   shuning uchun ikki xil harf.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap');
+
+:root {
+  /* ── Rang ───────────────────────────────────────────────────────
+     Muhr siyohi ko'k — rasmiy hujjatlardagi shtamp rangi.
+     Kuygan sariq-qizil — muddat tugayotganini bildiradi; qizildan
+     ko'ra kamroq vahima qo'zg'atadi, lekin e'tiborni tortadi. */
+  --paper:        #FCFCFA;
+  --paper-sunk:   #F4F4F0;
+  --paper-raised: #FFFFFF;
+
+  --ink:          #14171C;
+  --ink-2:        #58606E;
+  --ink-3:        #8B929F;
+
+  --rule:         #E4E4DE;
+  --rule-strong:  #D0D0C8;
+
+  --seal:         #1B3A6B;
+  --seal-hover:   #244C89;
+  --seal-tint:    #EDF2F9;
+  --seal-rule:    #C3D2E8;
+
+  --urgent:       #B4400F;
+  --urgent-tint:  #FDF0E9;
+  --verified:     #12664A;
+  --verified-tint:#E9F4EF;
+  --caution:      #8A6A12;
+  --caution-tint: #FBF4E3;
+
+  /* ── Shrift ─────────────────────────────────────────────────── */
+  --font-ui:   'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-data: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-read: 'IBM Plex Serif', Georgia, 'Times New Roman', serif;
+
+  /* ── O'lcham shkalasi ──────────────────────────────────────────
+     Har bir qadam aniq vazifaga ega, "shunchaki biroz kattaroq" emas. */
+  --t-micro: 11px;   /* yorliq, eyebrow */
+  --t-small: 12.5px; /* ikkinchi darajali matn */
+  --t-base:  14px;   /* interfeys */
+  --t-body:  15px;   /* uzun matn */
+  --t-lead:  17px;   /* tushuntirish (serif) */
+  --t-h3:    19px;
+  --t-h2:    24px;
+  --t-h1:    32px;
+  --t-hero:  44px;
+
+  /* ── Masofa ────────────────────────────────────────────────── */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 72px;
+
+  --radius:    8px;
+  --radius-sm: 5px;
+  --radius-lg: 12px;
+
+  --shadow-sm: 0 1px 2px rgba(20, 23, 28, 0.05);
+  --shadow:    0 2px 8px rgba(20, 23, 28, 0.07);
+  --shadow-lg: 0 12px 32px rgba(20, 23, 28, 0.13);
+
+  --topbar-h: 58px;
+}
+
+/* ── Reset ──────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--t-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* `display` beruvchi klass brauzerning [hidden] qoidasidan kuchliroq —
+   shuning uchun uni aniq ustun qilib qo'yamiz. Busiz `el.hidden = true`
+   .btn yoki .chip kabi elementlarda umuman ishlamaydi. */
+[hidden] { display: none !important; }
+
+h1, h2, h3, h4, p, figure, ul, ol, dl, dd { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+img, svg { display: block; max-width: 100%; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: none; border: none; padding: 0; cursor: pointer; }
+
+a { color: var(--seal); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Klaviatura bilan yurish ko'rinib turishi shart */
+:focus-visible {
+  outline: 2px solid var(--seal);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+:focus:not(:focus-visible) { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Tipografik yordamchilar ────────────────────────────────────── */
+.eyebrow {
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.num {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.muted { color: var(--ink-2); }
+.small { font-size: var(--t-small); }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   IMZO ELEMENTI — "Oddiy tilda" paneli
+   Rasmiy hujjat ichiga yopishtirilgan, odam tilida yozilgan izoh.
+   Serif shrift, kengroq qatorlar, muhr rangidagi chap chiziq.
+   ═══════════════════════════════════════════════════════════════ */
+.plain {
+  position: relative;
+  background: var(--seal-tint);
+  border-left: 3px solid var(--seal);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: var(--s5) var(--s5) var(--s4);
+  margin: var(--s4) 0;
+}
+
+.plain-label {
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--seal);
+  background: var(--paper-raised);
+  border: 1px solid var(--seal-rule);
+  border-radius: 100px;
+  padding: 3px 11px;
+  margin-bottom: var(--s3);
+}
+
+.plain-item { margin-bottom: var(--s4); }
+.plain-item:last-child { margin-bottom: 0; }
+
+.plain-item h4 {
+  font-family: var(--font-ui);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--seal);
+  opacity: 0.75;
+  margin-bottom: var(--s1);
+}
+
+.plain-item p,
+.plain-item li {
+  font-family: var(--font-read);
+  font-size: var(--t-lead);
+  line-height: 1.72;
+  color: var(--ink);
+}
+
+.plain-item ul { padding-left: var(--s4); }
+.plain-item li { list-style: disc; margin-bottom: var(--s1); }
+
+.plain-source {
+  font-family: var(--font-ui);
+  font-size: var(--t-micro);
+  color: var(--ink-3);
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--seal-rule);
+}
+
+/* ── Tugmalar ──────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  padding: 9px 17px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-size: var(--t-base);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn:hover { text-decoration: none; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary { background: var(--seal); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--seal-hover); }
+
+.btn-secondary {
+  background: var(--paper-raised);
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+.btn-secondary:hover:not(:disabled) { border-color: var(--ink-3); }
+
+.btn-ghost { color: var(--ink-2); }
+.btn-ghost:hover:not(:disabled) { background: var(--paper-sunk); color: var(--ink); }
+
+.btn-danger { background: var(--paper-raised); border-color: #E7C4B7; color: var(--urgent); }
+.btn-danger:hover:not(:disabled) { background: var(--urgent-tint); }
+
+.btn-sm { padding: 6px 12px; font-size: var(--t-small); }
+.btn-lg { padding: 13px 24px; font-size: var(--t-body); }
+.btn-block { width: 100%; }
+
+/* ── Maydonlar ─────────────────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 5px; }
+
+.field-label {
+  font-size: var(--t-small);
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.input, .select, .textarea {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--t-base);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input:focus, .select:focus, .textarea:focus {
+  outline: none;
+  border-color: var(--seal);
+  box-shadow: 0 0 0 3px var(--seal-tint);
+}
+.input::placeholder, .textarea::placeholder { color: var(--ink-3); }
+.textarea { resize: vertical; min-height: 84px; }
+
+.select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='%238B929F' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  padding-right: 32px;
+}
+
+.field-error { font-size: var(--t-small); color: var(--urgent); min-height: 17px; }
+
+/* ── Belgilar (chip) ───────────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.chip-neutral  { background: var(--paper-sunk); color: var(--ink-2); }
+.chip-seal     { background: var(--seal-tint); color: var(--seal); }
+.chip-verified { background: var(--verified-tint); color: var(--verified); }
+.chip-urgent   { background: var(--urgent-tint); color: var(--urgent); }
+.chip-caution  { background: var(--caution-tint); color: var(--caution); }
+
+/* ── Ogohlantirish bloklari ────────────────────────────────────── */
+.notice {
+  border-radius: var(--radius);
+  padding: var(--s3) var(--s4);
+  font-size: var(--t-small);
+  line-height: 1.65;
+  border: 1px solid;
+}
+.notice strong { font-weight: 600; }
+.notice-caution  { background: var(--caution-tint);  border-color: #EBD9AE; color: #6E5410; }
+.notice-caution strong { color: var(--caution); }
+.notice-urgent   { background: var(--urgent-tint);   border-color: #EFD0C2; color: #7E3216; }
+.notice-seal     { background: var(--seal-tint);     border-color: var(--seal-rule); color: #23405F; }
+.notice-verified { background: var(--verified-tint); border-color: #BFDFD1; color: #0E4E39; }
+
+/* ── Atama (lug'atdan) ─────────────────────────────────────────── */
+.term {
+  border-bottom: 1px dashed var(--seal-rule);
+  cursor: help;
+  color: inherit;
+}
+.term:hover { border-bottom-style: solid; border-bottom-color: var(--seal); }
+
+/* ── Yuklanish holati ──────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--paper-sunk) 25%, #EAEAE4 50%, var(--paper-sunk) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--seal-rule);
+  border-top-color: var(--seal);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

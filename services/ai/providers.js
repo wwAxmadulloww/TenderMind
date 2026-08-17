@@ -2,6 +2,22 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const OpenAI = require('openai').default || require('openai');
+const logger = require('../../logger');
+
+/**
+ * Kalit faqat uzunligi bo'yicha emas, prefiksi bo'yicha ham tekshiriladi.
+ * Aks holda noto'g'ri formatdagi kalit "ulandi" deb ko'rsatiladi va
+ * xato faqat birinchi real so'rovda ma'lum bo'ladi.
+ */
+function keyMatches(apiKey, prefixes, providerName) {
+  if (!apiKey || apiKey.length < 20) return false;
+  if (prefixes.some(prefix => apiKey.startsWith(prefix))) return true;
+  logger.warn(
+    `${providerName} kaliti noto'g'ri formatda (kutilgan boshlanish: ${prefixes.join(' yoki ')}). ` +
+    `Bu provider o'tkazib yuboriladi.`
+  );
+  return false;
+}
 
 class GroqProvider {
   constructor(apiKey) {
@@ -10,7 +26,7 @@ class GroqProvider {
   }
 
   isConfigured() {
-    return Boolean(this.apiKey && this.apiKey.length >= 20);
+    return keyMatches(this.apiKey, ['gsk_'], this.name);
   }
 
   async generate(prompt, systemInstruction, options = {}) {
@@ -58,7 +74,7 @@ class OpenAIProvider {
   }
 
   isConfigured() {
-    return Boolean(this.apiKey && this.apiKey.length >= 20);
+    return keyMatches(this.apiKey, ['sk-'], this.name);
   }
 
   async generate(prompt, systemInstruction, options = {}) {
@@ -100,7 +116,7 @@ class GeminiProvider {
   }
 
   isConfigured() {
-    return Boolean(this.apiKey && this.apiKey.length >= 20);
+    return keyMatches(this.apiKey, ['AIza'], this.name);
   }
 
   async generate(prompt, systemInstruction) {

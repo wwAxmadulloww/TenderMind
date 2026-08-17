@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>TenderMind — Admin panel</title>
+  <link rel="stylesheet" href="/assets/css/core.css">
+  <link rel="stylesheet" href="/assets/css/doc.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+  <!-- ── Kirish ekrani ─────────────────────────────────────────── -->
+  <div id="admin-login" class="admin-login">
+    <div class="admin-login-box">
+      <h1>TenderMind Admin</h1>
+      <p class="admin-login-sub">Boshqaruv paneliga kirish</p>
+      <form onsubmit="adminLogin(event)">
+        <div class="field">
+          <label class="field-label">Telefon</label>
+          <input type="tel" id="admin-phone" class="input" placeholder="+998901234567" required>
+        </div>
+        <div class="field">
+          <label class="field-label">Parol</label>
+          <input type="password" id="admin-password" class="input" required>
+        </div>
+        <div id="admin-login-error" class="admin-error"></div>
+        <button type="submit" class="admin-btn primary full">Kirish</button>
+      </form>
+      <a href="/" class="admin-back-link">← Asosiy sahifaga</a>
+    </div>
+  </div>
+
+  <!-- ── Panel ─────────────────────────────────────────────────── -->
+  <div id="admin-panel" class="admin-panel" style="display:none">
+    <header class="admin-header">
+      <div class="admin-brand">
+        <span class="logo-icon">⬡</span>
+        <strong>TenderMind</strong>
+        <span class="admin-tag">ADMIN</span>
+      </div>
+      <div class="admin-header-right">
+        <span id="admin-who" class="admin-who"></span>
+        <a href="/" class="admin-btn ghost small">Saytga</a>
+        <button class="admin-btn ghost small" onclick="adminLogout()">Chiqish</button>
+      </div>
+    </header>
+
+    <nav class="admin-nav">
+      <button class="admin-tab active" data-view="dashboard" onclick="showAdminView('dashboard')">Boshqaruv</button>
+      <button class="admin-tab" data-view="tenders" onclick="showAdminView('tenders')">Tenderlar</button>
+      <button class="admin-tab" data-view="users" onclick="showAdminView('users')">Foydalanuvchilar</button>
+      <button class="admin-tab" data-view="subs" onclick="showAdminView('subs')">
+        Obunalar <span id="subs-badge" class="admin-badge" style="display:none"></span>
+      </button>
+    </nav>
+
+    <main class="admin-main">
+      <section id="view-dashboard" class="admin-view"></section>
+      <section id="view-tenders" class="admin-view" style="display:none"></section>
+      <section id="view-users" class="admin-view" style="display:none"></section>
+      <section id="view-subs" class="admin-view" style="display:none"></section>
+    </main>
+  </div>
+</div>
+
+<div id="admin-toast" class="admin-toast"></div>
+
+<script src="/assets/js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+name: Testlar
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Bog'liqliklarni o'rnatish
+        run: npm ci
+
+      # Integratsion testlar mongodb-memory-server ishlatadi: u birinchi
+      # ishga tushishda mongod binarini yuklab oladi. Yuklamani kamaytirish
+      # uchun keshlaymiz.
+      - name: MongoDB binarini keshlash
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - name: Sintaksis tekshiruvi
+        run: |
+          for file in $(git ls-files '*.js' | grep -v '^assets/js/'); do
+            node --check "$file" || exit 1
+          done
+          echo "Barcha server fayllari sintaktik to'g'ri"
+
+      - name: Testlar
+        run: npm test
+        env:
+          NODE_ENV: test
+          JWT_SECRET: ci-uchun-uzun-va-tasodifiy-qiymat-0123456789abcdef
