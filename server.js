@@ -140,6 +140,11 @@ app.use((err, req, res, next) => {
   });
 });
 
+/** Loglarda parol ko'rinmasin */
+function maskUri(uri) {
+  return String(uri).replace(/(mongodb(?:\+srv)?:\/\/[^:]+:)[^@]*/, '$1***');
+}
+
 // ── Startup Config Validation ─────────────────────────────────────────
 function validateStartupConfig() {
   const warnings = [];
@@ -204,8 +209,22 @@ async function startServer() {
     logger.info(`TenderMind Server — http://localhost:${PORT}`);
     logger.info(`AI: ${isGeminiConfigured() ? `✅ ${aiManager.providerName()} ulandi` : '❌ AI API key kiriting'}`);
     logger.info(`Mode: ${process.env.NODE_ENV || 'development'}`);
-    logger.info(`MongoDB: ${isDBConnected() ? '✅ ulandi' : '❌ ulanmagan'}`);
-    if (isDBConnected()) logger.info(`Tenderlar: ${await tenderRepository.count()} ta ma'lumot bazada`);
+
+    if (isDBConnected()) {
+      logger.info(`MongoDB: ✅ ulandi`);
+      logger.info(`Tenderlar: ${await tenderRepository.count()} ta ma'lumot bazada`);
+    } else {
+      // Server ko'tariladi, lekin bazaga bog'liq har bir so'rov 503
+      // qaytaradi. Buni ishga tushirish paytida aniq aytish kerak —
+      // aks holda sayt "ishlayotgandek" ko'rinadi va faqat
+      // foydalanuvchi kirmoqchi bo'lganda muammo ma'lum bo'ladi.
+      logger.error('MongoDB: ❌ ULANMADI');
+      logger.error('Sayt ochiladi, lekin tenderlar, kirish va boshqa hammasi 503 qaytaradi.');
+      logger.error(config.mongodbUri
+        ? `MONGODB_URI ko'rsatilgan, lekin ulanib bo'lmadi: ${maskUri(config.mongodbUri)}`
+        : 'MONGODB_URI umuman sozlanmagan.');
+      logger.error('Yechim: tashqi bazasiz ishlash uchun →  npm run dev:local');
+    }
   });
 
   return server;

@@ -10,7 +10,8 @@
     "test": "node --test tests/*.test.js",
     "ingest": "node scripts/ingest.js",
     "bot": "node scripts/telegram-bot.js",
-    "make-admin": "node scripts/make-admin.js"
+    "make-admin": "node scripts/make-admin.js",
+    "dev:fresh": "node scripts/dev-local.js --fresh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

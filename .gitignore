@@ -27,3 +27,6 @@ build/
 
 # Build artifacts / zip
 *.zip
+
+# Lokal baza va sirlar (dev:local yaratadi)
+.data/

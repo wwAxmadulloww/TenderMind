@@ -10,13 +10,18 @@ Loyihaning maqsadi: tender sohasini bilmagan odam ham qatnasha olsin. Shuning uc
 
 ```bash
 npm install
-cp .env.example .env    # qiymatlarni to'ldiring
-npm run dev:local       # MongoDB Atlas kerak emas — xotirada ishlaydi
+npm run dev:local
 ```
 
 `http://localhost:3002` ochiladi. Lokal admin hisobi konsolda ko'rsatiladi.
 
-Haqiqiy baza bilan ishlash uchun `.env` da `MONGODB_URI` ni to'ldiring va `npm start`.
+**Tashqi baza kerak emas.** `dev:local` MongoDB ni o'zi ko'taradi va ma'lumotni `.data/mongo` da **saqlaydi** — yaratgan tenderlaringiz va foydalanuvchilar server qayta ishga tushganda ham joyida qoladi.
+
+```bash
+npm run dev:local -- --fresh   # bazani tozalab boshlash
+```
+
+`npm start` esa `.env` dagi `MONGODB_URI` ga ulanadi. Agar u ishlamasa, server ishga tushadi, lekin **bazaga bog'liq har bir so'rov 503 qaytaradi** — sayt ochiladi, tenderlar kelmaydi, kirish ishlamaydi. Buni ishga tushirish logi aniq aytadi.
 
 ---
 
