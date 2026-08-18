@@ -19,6 +19,19 @@
 
 <a href="#main" class="visually-hidden" data-i18n="nav.skipToMain">Asosiy mazmunga o'tish</a>
 
+<!-- Rasmiy nashr uslubidagi lenta: sana va jonli hisob.
+     Portalga institutsional og'irlik beradi. -->
+<div class="masthead">
+  <div class="masthead-inner">
+    <span class="masthead-seal" aria-hidden="true">⬡</span>
+    <span data-i18n="masthead.title">O'zbekiston davlat xaridlari</span>
+    <span class="masthead-sep" aria-hidden="true"></span>
+    <time id="masthead-date"></time>
+    <span class="masthead-sep" aria-hidden="true"></span>
+    <span><b id="masthead-count">—</b> <span data-i18n="masthead.active">faol e'lon</span></span>
+  </div>
+</div>
+
 <!-- ══ Yuqori panel ══════════════════════════════════════════════ -->
 <header class="topbar">
   <a href="#" class="brand" data-go="browse">
@@ -69,41 +82,86 @@
 <!-- ══ TENDERLAR ═════════════════════════════════════════════════ -->
 <section class="view is-active" id="view-browse">
   <div class="search-hero">
-    <div class="wrap">
-      <h1 data-i18n="hero.title">Davlat xaridlarida qatnashish — <em>hammaga ochiq</em></h1>
-      <p class="search-hero-sub" data-i18n="hero.sub">E'lonlarni toping, har bir lotni oddiy tilda tushuning va hujjatlarni tayyorlang.</p>
+    <div class="wrap hero-grid">
+      <div class="hero-main">
+        <h1 data-i18n="hero.title">Davlat xaridlarida qatnashish — <em>hammaga ochiq</em></h1>
+        <p class="search-hero-sub" data-i18n="hero.sub">E'lonlarni toping, har bir lotni oddiy tilda tushuning va hujjatlarni tayyorlang.</p>
 
-      <form class="searchbar" id="search-form" role="search">
-        <div class="searchbar-field">
-          <svg class="searchbar-icon" width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2"/>
-            <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <form class="searchbar" id="search-form" role="search">
+          <div class="searchbar-field">
+            <svg class="searchbar-icon" width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2"/>
+              <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <label for="search-input" class="visually-hidden" data-i18n="hero.searchLabel">Nima izlayapsiz?</label>
+            <input type="search" id="search-input" class="input" autocomplete="off"
+                   data-i18n-attr="placeholder:hero.searchPlaceholder"
+                   placeholder="Nima izlayapsiz? Masalan: parta, kompyuter, ovqat">
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg" data-i18n="hero.searchButton">Qidirish</button>
+        </form>
+
+        <!-- Bu raqamlar bazadagi haqiqiy holatdan olinadi. Hisoblab
+             bo'lmaydigan ko'rsatkich bu yerda ko'rsatilmaydi. -->
+        <dl class="search-stats" id="search-stats">
+          <div><dd class="num" id="stat-tenders">—</dd><dt data-i18n="hero.statTenders">faol e'lon</dt></div>
+          <div><dd class="num" id="stat-sectors">—</dd><dt data-i18n="hero.statSectors">soha</dt></div>
+          <div><dd class="num" id="stat-regions">—</dd><dt data-i18n="hero.statRegions">hudud</dt></div>
+        </dl>
+
+        <a href="#" class="beginner-door" data-go="guide">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M7.8 7.6a2.2 2.2 0 114 1.3c-.6.7-1.3 1-1.3 1.9M10 14.2h.01"
+                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
           </svg>
-          <label for="search-input" class="visually-hidden" data-i18n="hero.searchLabel">Nima izlayapsiz?</label>
-          <input type="search" id="search-input" class="input" autocomplete="off"
-                 data-i18n-attr="placeholder:hero.searchPlaceholder"
-                 placeholder="Nima izlayapsiz? Masalan: parta, kompyuter, ovqat">
+          <strong data-i18n="hero.beginnerTitle">Birinchi marta?</strong>
+          <span data-i18n="hero.beginnerText">Qadamma-qadam boshlang — 10 daqiqa</span>
+        </a>
+      </div>
+
+      <!-- Mahsulotning butun g'oyasi shu yerda ko'rinadi: rasmiy e'lon
+           va uning yonida odam tilidagi izohi. Bu bezak emas — tashrif
+           buyuruvchi birinchi ekrandayoq nima taklif qilinayotganini
+           tushunadi. -->
+      <aside class="hero-specimen" aria-label="Namuna">
+        <div class="specimen-doc">
+          <div class="specimen-stamp" aria-hidden="true">
+            <svg viewBox="0 0 100 100" fill="none">
+              <circle cx="50" cy="50" r="46" stroke="currentColor" stroke-width="2.5"/>
+              <circle cx="50" cy="50" r="38" stroke="currentColor" stroke-width="1"/>
+              <path d="M32 50l13 13 24-24" stroke="currentColor" stroke-width="4"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+
+          <p class="specimen-eyebrow">
+            <span class="specimen-badge" data-i18n="specimen.badge">NAMUNA</span>
+            <span data-i18n="specimen.lot">LOT №1 · TA'LIM</span>
+          </p>
+          <h2 class="specimen-title" data-i18n="specimen.title">Maktablar uchun o'quvchi partalari</h2>
+
+          <dl class="specimen-facts">
+            <div>
+              <dt data-i18n="specimen.price">Boshlang'ich narx</dt>
+              <dd class="num">270 000 000</dd>
+            </div>
+            <div>
+              <dt data-i18n="specimen.qty">Miqdori</dt>
+              <dd class="num">300 dona</dd>
+            </div>
+            <div>
+              <dt data-i18n="row.deadline">Muddat</dt>
+              <dd class="num" data-i18n="specimen.deadline">24 kun</dd>
+            </div>
+          </dl>
         </div>
-        <button type="submit" class="btn btn-primary btn-lg" data-i18n="hero.searchButton">Qidirish</button>
-      </form>
 
-      <!-- Bu raqamlar bazadagi haqiqiy holatdan olinadi. Hisoblab
-           bo'lmaydigan ko'rsatkich bu yerda ko'rsatilmaydi. -->
-      <p class="search-stats" id="search-stats">
-        <span><b id="stat-tenders">—</b> <span data-i18n="hero.statTenders">ta faol e'lon</span></span>
-        <span><b id="stat-sectors">—</b> <span data-i18n="hero.statSectors">ta soha</span></span>
-        <span><b id="stat-regions">—</b> <span data-i18n="hero.statRegions">ta hudud</span></span>
-      </p>
-
-      <a href="#" class="beginner-door" data-go="guide">
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.6"/>
-          <path d="M7.8 7.6a2.2 2.2 0 114 1.3c-.6.7-1.3 1-1.3 1.9M10 14.2h.01"
-                stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-        </svg>
-        <strong data-i18n="hero.beginnerTitle">Birinchi marta?</strong>
-        <span data-i18n="hero.beginnerText">Qadamma-qadam boshlang — 10 daqiqa</span>
-      </a>
+        <div class="specimen-plain">
+          <span class="plain-label" data-i18n="specimen.plainLabel">Oddiy tilda</span>
+          <p data-i18n="specimen.plainText">Maktabga 300 ta parta kerak. Siz 270 million so'mdan past narx taklif qilasiz. Mebel ishlab chiqaradigan har qanday kompaniya qatnasha oladi — tanish-bilish shart emas.</p>
+        </div>
+      </aside>
     </div>
   </div>
 

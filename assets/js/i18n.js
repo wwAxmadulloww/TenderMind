@@ -239,6 +239,16 @@ const DICT = {
     'phone.verify': "Tasdiqlash",
     'phone.done': "Telefon tasdiqlandi",
     'phone.smsOff': "SMS xizmati ulanmagan — tasdiqlash hozircha mavjud emas.",
+    'masthead.title': "O'zbekiston davlat xaridlari",
+    'masthead.active': "faol e'lon",
+    'specimen.badge': 'NAMUNA',
+    'specimen.lot': "LOT №1 · TA'LIM",
+    'specimen.title': "Maktablar uchun o'quvchi partalari",
+    'specimen.price': "Boshlang'ich narx",
+    'specimen.qty': "Miqdori",
+    'specimen.deadline': "24 kun",
+    'specimen.plainLabel': "Oddiy tilda",
+    'specimen.plainText': "Maktabga 300 ta parta kerak. Siz 270 million so'mdan past narx taklif qilasiz. Mebel ishlab chiqaradigan har qanday kompaniya qatnasha oladi — tanish-bilish shart emas.",
     'common.required': '*',
   },
 
@@ -455,6 +465,16 @@ const DICT = {
     'phone.verify': "Подтвердить",
     'phone.done': "Телефон подтверждён",
     'phone.smsOff': "SMS-сервис не подключён — подтверждение пока недоступно.",
+    'masthead.title': "Госзакупки Узбекистана",
+    'masthead.active': "активных объявлений",
+    'specimen.badge': 'ПРИМЕР',
+    'specimen.lot': "ЛОТ №1 · ОБРАЗОВАНИЕ",
+    'specimen.title': "Ученические парты для школ",
+    'specimen.price': "Начальная цена",
+    'specimen.qty': "Количество",
+    'specimen.deadline': "24 дня",
+    'specimen.plainLabel': "Простыми словами",
+    'specimen.plainText': "Школе нужно 300 парт. Вы предлагаете цену ниже 270 миллионов сум. Участвовать может любая компания, производящая мебель — связи не нужны.",
     'common.required': '*',
   },
 
@@ -671,6 +691,16 @@ const DICT = {
     'phone.verify': "Verify",
     'phone.done': "Phone verified",
     'phone.smsOff': "SMS is not connected — verification is unavailable for now.",
+    'masthead.title': "Uzbekistan public procurement",
+    'masthead.active': "active notices",
+    'specimen.badge': 'EXAMPLE',
+    'specimen.lot': "LOT №1 · EDUCATION",
+    'specimen.title': "School desks for classrooms",
+    'specimen.price': "Starting price",
+    'specimen.qty': "Quantity",
+    'specimen.deadline': "24 days",
+    'specimen.plainLabel': "In plain language",
+    'specimen.plainText': "A school needs 300 desks. You bid below 270 million UZS. Any furniture maker can take part — you do not need connections.",
     'common.required': '*',
   },
 };
@@ -687,6 +717,29 @@ const REGIONS = {
   ru: { toshkent: 'Ташкент', samarqand: 'Самарканд', buxoro: 'Бухара', andijon: 'Андижан', namangan: 'Наманган', fargona: 'Фергана', qashqadaryo: 'Кашкадарья', surxondaryo: 'Сурхандарья', xorazm: 'Хорезм', navoiy: 'Навои', jizzax: 'Джизак', sirdaryo: 'Сырдарья', qoraqalpogiston: 'Каракалпакстан', boshqa: 'Прочее' },
   en: { toshkent: 'Tashkent', samarqand: 'Samarkand', buxoro: 'Bukhara', andijon: 'Andijan', namangan: 'Namangan', fargona: 'Fergana', qashqadaryo: 'Qashqadaryo', surxondaryo: 'Surxondaryo', xorazm: 'Khorezm', navoiy: 'Navoiy', jizzax: 'Jizzakh', sirdaryo: 'Sirdaryo', qoraqalpogiston: 'Karakalpakstan', boshqa: 'Other' },
 };
+
+/**
+ * Oy nomlari qo'lda beriladi.
+ *
+ * `toLocaleDateString('uz-UZ', { month: 'long' })` ba'zi brauzerlarda
+ * "M08" qaytaradi — o'zbek tili uchun ICU ma'lumoti to'liq emas.
+ * Sana rasmiy sahifada turadi, shuning uchun taxminga tashlab
+ * bo'lmaydi.
+ */
+const MONTHS = {
+  uz: ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun',
+       'iyul', 'avgust', 'sentyabr', 'oktyabr', 'noyabr', 'dekabr'],
+  ru: ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+       'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'],
+  en: ['January', 'February', 'March', 'April', 'May', 'June',
+       'July', 'August', 'September', 'October', 'November', 'December'],
+};
+
+/** "18 avgust 2026" / "18 августа 2026" / "18 August 2026" */
+export function formatLongDate(date = new Date()) {
+  const months = MONTHS[current] || MONTHS.uz;
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+}
 
 export const LANGS = ['uz', 'ru', 'en'];
 const DEFAULT_LANG = 'uz';

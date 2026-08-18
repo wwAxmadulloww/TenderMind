@@ -94,6 +94,12 @@ Serif tasodifiy tanlanmagan: rasmiy hujjat va uni tushuntirayotgan odam — ikki
 
 Barcha rang va o'lcham qiymatlari `assets/css/core.css` da CSS o'zgaruvchilari sifatida. Boshqa faylda qo'lda rang yozilmaydi.
 
+**Bosh ekrandagi namuna kartasi** — bezak emas: chapda rasmiy e'lon, pastda uning odam tilidagi izohi. Tashrif buyuruvchi birinchi ekrandayoq mahsulot nima qilishini ko'radi. Karta «NAMUNA» deb belgilangan, chunki u haqiqiy e'londan farq qilmaydi.
+
+**Soha ranglari** ham bezak emas: o'nlab e'lonni ko'z bilan chopib chiqayotgan odam kerakli sohani chap chiziq rangi bo'yicha topadi.
+
+**Muddat ko'rsatkichi** faqat 45 kundan kam qolganda ko'rinadi. Har doim ko'rinsa u har doim to'la bo'lardi va hech narsa bildirmasdi — chiziq paydo bo'lishining o'zi «bu e'lon tugayapti» degani.
+
 ### Tillar
 Interfeys **uz / ru / en**. O'zbekiston biznesida rus tili keng ishlatiladi, shuning uchun RU to'liq qo'llab-quvvatlanadi.
 

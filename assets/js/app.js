@@ -9,7 +9,7 @@
 'use strict';
 
 import {
-  t, initLang, setLang, getLang, onLangChange,
+  t, initLang, setLang, getLang, onLangChange, formatLongDate,
   sectorName, regionName, sectorKeys, regionKeys, LANGS,
 } from './i18n.js';
 
@@ -460,13 +460,36 @@ function renderResults() {
   list.innerHTML = items.map(renderRow).join('');
 }
 
+/**
+ * Muddat ko'rsatkichi — FAQAT ma'no bergandagina ko'rsatiladi.
+ *
+ * Muddatga 45 kundan ko'p qolgan bo'lsa chiziq har doim to'la bo'lardi
+ * va hech narsa bildirmasdi, faqat shovqin qo'shardi. Chiziq
+ * ko'ringanining o'zi "bu e'lon tugayapti" degani.
+ */
+const DEADLINE_WINDOW_DAYS = 45;
+
+function deadlineProgress(deadline) {
+  const left = daysLeft(deadline);
+  if (left > DEADLINE_WINDOW_DAYS) return null;
+  if (left <= 0) return { percent: 100, state: 'is-urgent' };
+
+  // Qolgan vaqt qanchalik kam bo'lsa, chiziq shunchalik uzun —
+  // "tugash darajasi", "qolgan vaqt" emas.
+  const percent = Math.round((1 - left / DEADLINE_WINDOW_DAYS) * 100);
+  const state = left <= 7 ? 'is-urgent' : left <= 21 ? 'is-soon' : '';
+  return { percent: Math.max(6, percent), state };
+}
+
 function renderRow(item) {
   const deadline = deadlineText(item.deadline);
+  const progress = deadlineProgress(item.deadline);
   const saved = state.savedIds.has(item.id);
   const lotCount = item.lotCount || 1;
 
   return `
-  <article class="row" role="listitem" data-id="${esc(item.id)}">
+  <article class="row" role="listitem" data-id="${esc(item.id)}"
+           style="--row-accent: var(--s-${esc(item.soha || 'boshqa')})">
     <div class="row-top">
       <span class="row-sector">${esc(sectorName(item.soha))}</span>
       <span class="row-dot">·</span>
@@ -504,6 +527,11 @@ function renderRow(item) {
         </button>
       </span>
     </div>
+
+    ${progress ? `
+    <div class="row-deadline-bar" aria-hidden="true">
+      <div class="row-deadline-fill ${progress.state}" style="width:${progress.percent}%"></div>
+    </div>` : ''}
 
     <div class="row-explain" id="explain-${esc(item.id)}" hidden></div>
   </article>`;
@@ -1511,6 +1539,7 @@ async function loadStats() {
     // umumiy hisob endpointi yo'q — taxmin qilib yozish ma'lumotni
     // soxtalashtirish bo'lardi, shuning uchun u ko'rsatilmaydi.
     $('#stat-tenders').textContent = som(tenders.total);
+    renderMasthead(tenders.total);
     $('#stat-sectors').textContent = String(sectorKeys().length);
     $('#stat-regions').textContent = String(regionKeys().length);
   } catch {
@@ -1532,6 +1561,7 @@ $$('[data-lang]').forEach(btn => {
 // qayta chiziladi — aks holda ro'yxat va panellar eski tilda qolardi.
 onLangChange(() => {
   renderLangSwitch();
+  renderMasthead();
   renderSectorFilter();
   renderResults();
   renderPagination();
@@ -1543,8 +1573,20 @@ onLangChange(() => {
   if (state.view === 'guide') { guideLoaded = false; loadGuide(); }
 });
 
+/** Masthead: bugungi sana va faol e'lonlar soni */
+function renderMasthead(activeCount) {
+  const dateEl = $('#masthead-date');
+  if (dateEl) {
+    const today = new Date();
+    dateEl.dateTime = today.toISOString().slice(0, 10);
+    dateEl.textContent = formatLongDate(today);
+  }
+  if (activeCount != null) $('#masthead-count').textContent = som(activeCount);
+}
+
 async function init() {
   initLang();
+  renderMasthead();
   renderLangSwitch();
   renderAuthState();
   renderSectorFilter();
