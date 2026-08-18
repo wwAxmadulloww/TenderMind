@@ -293,6 +293,8 @@
       </form>
     </div>
 
+    <div class="panel" id="panel-phone"></div>
+
     <div class="panel" id="panel-telegram"></div>
 
     <div class="panel">
@@ -403,6 +405,40 @@
         </div>
         <p class="field-error" id="login-error"></p>
         <button type="submit" class="btn btn-primary btn-block btn-lg" data-i18n="auth.tabLogin">Kirish</button>
+        <button type="button" class="btn btn-ghost btn-block btn-sm" id="forgot-link"
+                style="margin-top:var(--s2)" data-i18n="auth.forgot">Parolni unutdingizmi?</button>
+      </form>
+
+      <!-- Parolni tiklash: 1-qadam — raqam, 2-qadam — kod va yangi parol -->
+      <form id="forgot-form" hidden>
+        <p class="small muted" style="margin-bottom:var(--s3)" data-i18n="auth.forgotHint">
+          Ro'yxatdan o'tgan telefon raqamingizni kiriting — SMS orqali kod yuboramiz.
+        </p>
+        <div class="field" style="margin-bottom: var(--s2)">
+          <label class="field-label" for="f-phone" data-i18n="auth.phone">Telefon</label>
+          <input id="f-phone" name="phone" class="input" type="tel" required
+                 placeholder="+998 90 123 45 67" autocomplete="tel">
+        </div>
+        <p class="field-error" id="forgot-error"></p>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" data-i18n="auth.sendCode">Kod yuborish</button>
+        <button type="button" class="btn btn-ghost btn-block btn-sm" data-auth-tab="login"
+                style="margin-top:var(--s2)" data-i18n="auth.backToLogin">← Kirishga qaytish</button>
+      </form>
+
+      <form id="reset-form" hidden>
+        <p class="small muted" style="margin-bottom:var(--s3)" id="reset-hint"></p>
+        <div class="field" style="margin-bottom: var(--s3)">
+          <label class="field-label" for="rs-code" data-i18n="auth.code">SMS kodi</label>
+          <input id="rs-code" name="code" class="input" inputmode="numeric" maxlength="6"
+                 required autocomplete="one-time-code" placeholder="123456">
+        </div>
+        <div class="field" style="margin-bottom: var(--s2)">
+          <label class="field-label" for="rs-password" data-i18n="auth.newPassword">Yangi parol</label>
+          <input id="rs-password" name="newPassword" class="input" type="password"
+                 required minlength="6" autocomplete="new-password">
+        </div>
+        <p class="field-error" id="reset-error"></p>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" data-i18n="auth.setPassword">Parolni o'rnatish</button>
       </form>
 
       <form id="register-form" hidden>

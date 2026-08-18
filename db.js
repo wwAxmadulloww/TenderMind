@@ -23,6 +23,17 @@ const UserSchema = new mongoose.Schema({
   // berilgan barcha tokenlar darhol kuchsizlanadi. Busiz "Chiqish" faqat
   // brauzerdagi nusxani o'chirardi, o'g'irlangan token 30 kun ishlayverardi.
   tokenVersion: { type: Number, default: 0 },
+
+  // Telefon tasdiqlash va parolni tiklash. Kod ochiq saqlanmaydi —
+  // faqat hash, muddat va urinishlar soni.
+  phoneVerified: { type: Boolean, default: false },
+  verification: {
+    codeHash: { type: String, default: '' },
+    purpose: { type: String, enum: ['phone', 'reset', ''], default: '' },
+    expiresAt: { type: Date, default: null },
+    attempts: { type: Number, default: 0 },
+    lastSentAt: { type: Date, default: null },
+  },
   plan: { type: String, enum: ['free', 'pro', 'corporate'], default: 'free' },
   planExpiresAt: { type: Date, default: null },
   savedTenders: { type: [String], default: [] },

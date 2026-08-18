@@ -3,9 +3,11 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
+const verificationController = require('../controllers/verificationController');
 const { authMiddleware } = require('../middleware/auth');
 const { validateBody, sanitizeBody, normalizeUzbekPhone } = require('../validators');
 const requireDB = require('../middleware/dbReady');
+const { registerLimiter, loginLimiter, codeLimiter } = require('../middleware/rateLimits');
 
 // Barcha auth amallari bazaga bog'liq
 router.use(requireDB);
@@ -29,12 +31,20 @@ function normalizeAuthPhone(req, res, next) {
 }
 
 // Routes
-router.post('/register', authRegisterSanitize, normalizeAuthPhone, validateBody(registerRules), authController.register);
-router.post('/login', normalizeAuthPhone, validateBody(loginRules), authController.login);
+router.post('/register', registerLimiter, authRegisterSanitize, normalizeAuthPhone, validateBody(registerRules), authController.register);
+router.post('/login', loginLimiter, normalizeAuthPhone, validateBody(loginRules), authController.login);
 router.get('/me', authMiddleware, authController.getProfile);
 router.post('/logout', authMiddleware, authController.logout);
 router.put('/change-password', authMiddleware, authController.changePassword);
 router.put('/profile', authMiddleware, authController.updateProfile);
+
+// ── Telefon tasdiqlash va parolni tiklash ────────────────────────────
+router.get('/sms-status', verificationController.smsStatus);
+router.post('/send-code', codeLimiter, authMiddleware, verificationController.sendPhoneCode);
+router.post('/verify-phone', authMiddleware, verificationController.verifyPhone);
+
+router.post('/forgot-password', codeLimiter, verificationController.forgotPassword);
+router.post('/reset-password', loginLimiter, verificationController.resetPassword);
 
 // Telegram xabarnomasi
 router.get('/telegram-code', authMiddleware, authController.getTelegramCode);

@@ -27,7 +27,7 @@ Haqiqiy baza bilan ishlash uchun `.env` da `MONGODB_URI` ni to'ldiring va `npm s
 | `npm start` | Serverni ishga tushirish |
 | `npm run dev` | Avtomatik qayta yuklanadigan rejim |
 | `npm run dev:local` | Xotiradagi MongoDB bilan (Atlas kerak emas) |
-| `npm test` | Testlar (138 ta) |
+| `npm test` | Testlar (160 ta) |
 | `npm run ingest -- file --path=./data/namuna-tenderlar.json` | Ma'lumot import qilish |
 | `npm run bot` | Telegram botni ishga tushirish |
 | `npm run make-admin -- +998901234567` | Foydalanuvchini admin qilish |
@@ -127,7 +127,21 @@ Limit **muvaffaqiyatli so'rovdan keyin** sarflanadi: AI xato bersa yoki javob ke
 | **Qidiruv tozalash** | Foydalanuvchi kiritmasi hech qachon `new RegExp()` ga bermaydi. Busiz oddiy `C++` so'rovi ham serverni yiqitardi. |
 | **Rol bazadan** | Har so'rovda tekshiriladi, tokendan olinmaydi. |
 
-Parolni unutgan foydalanuvchi uchun admin vaqtinchalik parol yaratadi (`/admin` → Foydalanuvchilar). O'z-o'zini tiklash SMS yetkazishni talab qiladi — u ulanmagan, shuning uchun yolg'on "kod yubordik" xabari o'rniga ishlaydigan yo'l qoldirilgan.
+**Cheklovlar** (`config/index.js` → `rateLimits`): ro'yxatdan o'tish soatiga 5, kirish 15 daqiqada 10 (muvaffaqiyatli kirish sanalmaydi), SMS kodi soatiga 5. Test muhitida ular ataylab yuqori — barcha testlar bitta IP dan keladi.
+
+### SMS: telefon tasdiqlash va parolni tiklash
+`.env` da Eskiz.uz yoki Play Mobile kaliti bo'lsa yoqiladi:
+
+- **Parolni unutdim** — kirish oynasida havola, SMS kodi bilan yangi parol o'rnatiladi
+- **Telefonni tasdiqlash** — sozlamalarda
+
+Kod 6 xonali, 5 daqiqa amal qiladi, 5 ta noto'g'ri urinishdan keyin bloklanadi. Bazada faqat hash saqlanadi.
+
+`forgot-password` **raqam bazada bor-yo'qligini oshkor qilmaydi** — javob har doim bir xil, aks holda bu endpoint foydalanuvchilar ro'yxatini yig'ish vositasiga aylanardi.
+
+Kalit yo'q bo'lsa interfeys buni ochiq aytadi. Development uchun `SMS_CONSOLE=true` — kod SMS o'rniga logga yoziladi.
+
+Kalit umuman bo'lmasa, admin `/admin` → Foydalanuvchilar bo'limida vaqtinchalik parol bera oladi.
 
 ### Admin panel — `/admin`
 Statistika, tender/lot qo'shish va o'chirish, foydalanuvchi tariflari, to'lov tasdiqlash.
@@ -206,7 +220,7 @@ AI kalitlari **formati bo'yicha** tekshiriladi (`gsk_`, `sk-`, `AIza`). Noto'g'r
 npm test
 ```
 
-138 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
+160 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
 
 Qamrov: telefon normalizatsiyasi, tarif limitlari, AI kalit validatsiyasi, route himoyasi, baza uzilgandagi xatti-harakat, lot tushuntirish, ta'lim moduli, admin huquqi, to'lov oqimi, ingestion normalizatsiyasi va dedupe, robots.txt qoidalari, Telegram buyruqlari, SEO sahifalari va indekslash qoidalari.
 

@@ -93,7 +93,10 @@ async function getProfile(req, res) {
     const user = req.dbUser;
     res.json({
       success: true,
-      user: { id: user.id, name: user.name, phone: user.phone, company: user.company }
+      user: {
+        id: user.id, name: user.name, phone: user.phone, company: user.company,
+        phoneVerified: Boolean(user.phoneVerified),
+      }
     });
   } catch (err) {
     logger.error('Get profile error', err);

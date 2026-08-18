@@ -10,7 +10,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+const { authLimiter } = require('./middleware/rateLimits');
 const path = require('path');
 const logger = require('./logger');
 const config = require('./config');
@@ -88,12 +88,6 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 // sahifaning o'zi statik fayl (unda maxfiy ma'lumot yo'q).
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
-// Rate limiter for general Auth endpoints
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 60,
-  message: { error: 'Juda ko\'p so\'rov. 15 daqiqadan keyin urinib ko\'ring.' }
-});
 
 // ── Health Check Endpoint ─────────────────────────────────────────────
 // Routerlardan OLDIN turishi shart: baza uzilganda ham javob berishi kerak,
@@ -111,7 +105,7 @@ app.get('/api/health', (req, res) => {
 // ── Mount Routers ─────────────────────────────────────────────────────
 // Bazaga bog'liq routerlar o'z ichida requireDB ni chaqiradi (routes/*.js),
 // shuning uchun bu yerda faqat mount qilinadi. Eksport bazaga bog'liq emas.
-app.use('/api/auth', apiLimiter, authRouter);
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api', tendersRouter);
 app.use('/api', lotsRouter);
 app.use('/api', learnRouter);

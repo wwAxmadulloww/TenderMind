@@ -644,3 +644,6 @@
   .chat-toggle { bottom: calc(62px + var(--s3)); }
   .toasts { bottom: calc(62px + var(--s3)); }
 }
+
+/* Auth oynasidagi yorliqlar parolni tiklash bosqichida yashiriladi */
+.tabs[hidden] { display: none; }

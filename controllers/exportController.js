@@ -8,6 +8,38 @@ function splitDocLines(text) {
 }
 
 /**
+ * Eksport hajmi chegarasi.
+ *
+ * Generatsiya bosqichida maydonlar cheklangan, lekin eksport endpointi
+ * mijozdan kelgan matnni to'g'ridan-to'g'ri qabul qiladi — ya'ni kimdir
+ * qo'lda ulkan matn yuborib serverni PDF/DOCX qurishga majburlab,
+ * xotira va protsessorni band qilishi mumkin edi.
+ */
+const MAX_DOC_CHARS = 60000;      // bitta hujjat
+const MAX_TOTAL_CHARS = 300000;   // barcha hujjatlar birgalikda
+
+/**
+ * @returns {string|null} xato matni, yoki null — hammasi joyida
+ */
+function checkExportSize({ docs, content }) {
+  const parts = docs && typeof docs === 'object' ? Object.values(docs) : [content];
+  let total = 0;
+
+  for (const part of parts) {
+    const length = String(part || '').length;
+    if (length > MAX_DOC_CHARS) {
+      return `Hujjat juda uzun (${MAX_DOC_CHARS} belgidan oshmasin)`;
+    }
+    total += length;
+  }
+
+  if (total > MAX_TOTAL_CHARS) {
+    return `Hujjatlar birgalikda juda katta (${MAX_TOTAL_CHARS} belgidan oshmasin)`;
+  }
+  return null;
+}
+
+/**
  * pdfkit ning standart shriftlari (Helvetica) WinAnsi kodlashdan foydalanadi —
  * emoji va lotin bo'lmagan belgilar buzilgan holda chiqadi yoki xato beradi.
  * Shuning uchun PDF ga yozishdan oldin matn tozalanadi.
@@ -25,7 +57,10 @@ function pdfSafe(text) {
  */
 function exportWord(req, res) {
   const { title, docs, content } = req.body;
-  if (!docs && !content) return res.status(400).json({ error: 'No content' });
+  if (!docs && !content) return res.status(400).json({ error: 'Eksport uchun mazmun yo\'q' });
+
+  const tooBig = checkExportSize({ docs, content });
+  if (tooBig) return res.status(413).json({ error: tooBig });
 
   const { Document, Packer, Paragraph, TextRun } = docx;
   let children = [];
@@ -101,7 +136,10 @@ function exportWord(req, res) {
  */
 function exportPdf(req, res) {
   const { title, docs, content } = req.body;
-  if (!docs && !content) return res.status(400).send('No content');
+  if (!docs && !content) return res.status(400).json({ error: 'Eksport uchun mazmun yo\'q' });
+
+  const tooBig = checkExportSize({ docs, content });
+  if (tooBig) return res.status(413).json({ error: tooBig });
 
   const pdf = new PDFDocument({ margin: 40, bufferPages: true });
 
@@ -156,5 +194,8 @@ function exportPdf(req, res) {
 
 module.exports = {
   exportWord,
-  exportPdf
+  exportPdf,
+  checkExportSize,
+  MAX_DOC_CHARS,
+  MAX_TOTAL_CHARS,
 };

@@ -240,14 +240,101 @@ document.addEventListener('click', (e) => {
   }
 });
 
+/**
+ * Kirish oynasida to'rt holat: kirish, ro'yxatdan o'tish, raqam so'rash
+ * va kod kiritish. Yorliqlar faqat birinchi ikkitasini boshqaradi,
+ * qolgan ikkitasiga parolni tiklash oqimi olib boradi.
+ */
+function showAuthMode(mode) {
+  const forms = { login: '#login-form', register: '#register-form', forgot: '#forgot-form', reset: '#reset-form' };
+  for (const [name, selector] of Object.entries(forms)) {
+    $(selector).hidden = name !== mode;
+  }
+
+  $$('[data-auth-tab]').forEach(el =>
+    el.setAttribute('aria-selected', String(el.dataset.authTab === mode)));
+
+  const titles = {
+    login: 'auth.signinTitle', register: 'auth.registerTitle',
+    forgot: 'auth.resetTitle', reset: 'auth.resetTitle',
+  };
+  $('#auth-title').textContent = t(titles[mode]);
+
+  // Yorliqlar faqat kirish/ro'yxat holatlarida mazmunli
+  $('.tabs').hidden = mode === 'forgot' || mode === 'reset';
+}
+
 $$('[data-auth-tab]').forEach(tab => {
-  tab.addEventListener('click', () => {
-    const mode = tab.dataset.authTab;
-    $$('[data-auth-tab]').forEach(el => el.setAttribute('aria-selected', String(el === tab)));
-    $('#login-form').hidden = mode !== 'login';
-    $('#register-form').hidden = mode !== 'register';
-    $('#auth-title').textContent = t(mode === 'login' ? 'auth.signinTitle' : 'auth.registerTitle');
-  });
+  tab.addEventListener('click', () => showAuthMode(tab.dataset.authTab));
+});
+
+// ── Parolni tiklash ─────────────────────────────────────────────────
+let resetPhone = '';
+
+$('#forgot-link').addEventListener('click', async () => {
+  // SMS ulanmagan bo'lsa oqimni umuman ochmaymiz — foydalanuvchini
+  // ishlamaydigan formaga olib borish o'rniga sababini aytamiz.
+  try {
+    const { available } = await apiJson('/api/auth/sms-status');
+    if (!available) return toast(t('auth.smsOff'), 'error');
+  } catch { /* holat noma'lum — oqimni ochaveramiz */ }
+
+  $('#f-phone').value = $('#l-phone').value.trim();
+  showAuthMode('forgot');
+});
+
+$('#forgot-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const error = $('#forgot-error');
+  const button = e.target.querySelector('button[type="submit"]');
+  error.textContent = '';
+  button.disabled = true;
+
+  try {
+    resetPhone = e.target.phone.value.trim();
+    await apiJson('/api/auth/forgot-password', {
+      method: 'POST', body: JSON.stringify({ phone: resetPhone }),
+    });
+    $('#reset-hint').textContent = t('auth.codeSent', { phone: resetPhone });
+    showAuthMode('reset');
+    $('#rs-code').focus();
+  } catch (err) {
+    error.textContent = err.data?.message || err.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$('#reset-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const error = $('#reset-error');
+  const button = e.target.querySelector('button[type="submit"]');
+  error.textContent = '';
+  button.disabled = true;
+
+  try {
+    const data = await apiJson('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        phone: resetPhone,
+        code: e.target.code.value.trim(),
+        newPassword: e.target.newPassword.value,
+      }),
+    });
+
+    // Server darhol token beradi — foydalanuvchi qayta kirmaydi
+    persistSession(data);
+    closeModal('auth-modal');
+    e.target.reset();
+    showAuthMode('login');
+    toast(t('auth.resetDone'), 'success');
+    await Promise.all([loadSaved(), loadWon()]);
+    renderResults();
+  } catch (err) {
+    error.textContent = err.message;
+  } finally {
+    button.disabled = false;
+  }
 });
 
 $('#login-form').addEventListener('submit', async (e) => {
@@ -732,6 +819,7 @@ async function loadAccount() {
   $('#p-company').value = state.user?.company || '';
 
   renderBillingPanel();
+  renderPhonePanel();
   renderTelegramPanel();
 
   // Admin bo'lsa menyuda havola ko'rsatamiz
@@ -775,6 +863,80 @@ async function renderBillingPanel() {
   } catch {
     panel.innerHTML = '<p class="muted small">Tarif ma\'lumotini yuklab bo\'lmadi.</p>';
   }
+}
+
+/** Sozlamalardagi telefon tasdiqlash bloki */
+async function renderPhonePanel() {
+  const panel = $('#panel-phone');
+  const phone = state.user?.phone || '';
+
+  let smsAvailable = false;
+  try {
+    smsAvailable = (await apiJson('/api/auth/sms-status')).available;
+  } catch { /* noma'lum — ulanmagan deb hisoblaymiz */ }
+
+  let verified = false;
+  try {
+    verified = Boolean((await apiJson('/api/auth/me')).user?.phoneVerified);
+  } catch { /* jimgina */ }
+
+  const head = (chipClass, chipKey) => `
+    <div class="panel-head">
+      <h3>${esc(t('phone.title'))}</h3>
+      <span class="chip ${chipClass}">${esc(t(chipKey))}</span>
+    </div>
+    <p class="small muted" style="margin-bottom:var(--s3)">${esc(phone)}</p>`;
+
+  if (verified) {
+    panel.innerHTML = head('chip-verified', 'phone.verified');
+    return;
+  }
+
+  if (!smsAvailable) {
+    panel.innerHTML = head('chip-neutral', 'phone.unverified')
+      + `<p class="small muted">${esc(t('phone.smsOff'))}</p>`;
+    return;
+  }
+
+  panel.innerHTML = head('chip-caution', 'phone.unverified')
+    + `<p class="small muted" style="margin-bottom:var(--s3)">${esc(t('phone.why'))}</p>
+       <button type="button" class="btn btn-secondary btn-sm" id="phone-send">${esc(t('phone.send'))}</button>
+       <div id="phone-verify-box" hidden style="margin-top:var(--s3)">
+         <div class="field" style="max-width:200px;margin-bottom:var(--s2)">
+           <label class="field-label" for="phone-code">${esc(t('phone.enterCode'))}</label>
+           <input id="phone-code" class="input" inputmode="numeric" maxlength="6"
+                  autocomplete="one-time-code" placeholder="123456">
+         </div>
+         <p class="field-error" id="phone-error"></p>
+         <button type="button" class="btn btn-primary btn-sm" id="phone-verify">${esc(t('phone.verify'))}</button>
+       </div>`;
+
+  $('#phone-send').addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    try {
+      await apiJson('/api/auth/send-code', { method: 'POST', auth: true });
+      $('#phone-verify-box').hidden = false;
+      $('#phone-code').focus();
+    } catch (err) {
+      toast(err.data?.message || err.message, 'error');
+      e.target.disabled = false;
+    }
+  });
+
+  $('#phone-verify').addEventListener('click', async () => {
+    const error = $('#phone-error');
+    error.textContent = '';
+    try {
+      await apiJson('/api/auth/verify-phone', {
+        method: 'POST', auth: true,
+        body: JSON.stringify({ code: $('#phone-code').value.trim() }),
+      });
+      toast(t('phone.done'), 'success');
+      renderPhonePanel();
+    } catch (err) {
+      error.textContent = err.message;
+    }
+  });
 }
 
 async function renderTelegramPanel() {
