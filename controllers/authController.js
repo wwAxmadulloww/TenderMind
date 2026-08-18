@@ -1,8 +1,8 @@
 'use strict';
 
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const { User } = require('../models');
+const { signToken } = require('../middleware/auth');
 const config = require('../config');
 const logger = require('../logger');
 const asyncHandler = require('../utils/asyncHandler');
@@ -38,11 +38,7 @@ async function register(req, res) {
       passwordHash: hashedPwd
     });
 
-    const token = jwt.sign(
-      { id: user.id, name: user.name, phone: user.phone },
-      config.jwtSecret,
-      { expiresIn: '30d' }
-    );
+    const token = signToken(user);
 
     res.status(201).json({
       success: true,
@@ -70,11 +66,10 @@ async function login(req, res) {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Telefon yoki parol noto\'g\'ri' });
 
-    const token = jwt.sign(
-      { id: user.id, name: user.name, phone: user.phone },
-      config.jwtSecret,
-      { expiresIn: '30d' }
-    );
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    const token = signToken(user);
 
     res.json({
       success: true,
@@ -94,8 +89,8 @@ async function login(req, res) {
  */
 async function getProfile(req, res) {
   try {
-    const user = await User.findOne({ id: req.user.id });
-    if (!user) return res.status(401).json({ error: 'Sessiya yaroqsiz — qaytadan kiring' });
+    // authMiddleware foydalanuvchini allaqachon yuklab qo'ygan
+    const user = req.dbUser;
     res.json({
       success: true,
       user: { id: user.id, name: user.name, phone: user.phone, company: user.company }
@@ -123,16 +118,23 @@ async function changePassword(req, res) {
       return res.status(400).json({ error: 'Yangi parol eski paroldan farq qilishi kerak' });
     }
 
-    const user = await User.findOne({ id: req.user.id });
-    if (!user) return res.status(401).json({ error: 'Sessiya yaroqsiz — qaytadan kiring' });
+    const user = req.dbUser;
 
     const ok = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Joriy parol noto\'g\'ri' });
 
     user.passwordHash = await bcrypt.hash(newPassword, 10);
+    // Parol o'zgardi — eski tokenlarni ham bekor qilamiz. Agar parol
+    // o'g'irlangani uchun almashtirilayotgan bo'lsa, buzg'unchining
+    // tokeni ham shu daqiqada ishlamay qoladi.
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
 
-    res.json({ success: true, message: 'Parol muvaffaqiyatli o\'zgartirildi' });
+    res.json({
+      success: true,
+      message: 'Parol o\'zgartirildi. Boshqa qurilmalardagi sessiyalar yopildi.',
+      token: signToken(user),
+    });
   } catch (err) {
     logger.error('Change password error', err);
     res.status(500).json({ error: 'Parolni o\'zgartirishda xatolik yuz berdi' });
@@ -153,8 +155,7 @@ async function updateProfile(req, res) {
       return res.status(400).json({ error: 'Kompaniya nomi 100 belgidan oshmasin' });
     }
 
-    const user = await User.findOne({ id: req.user.id });
-    if (!user) return res.status(401).json({ error: 'Sessiya yaroqsiz — qaytadan kiring' });
+    const user = req.dbUser;
 
     if (name) user.name = name.trim();
     if (company !== undefined) user.company = company.trim();
@@ -177,8 +178,7 @@ async function updateProfile(req, res) {
 async function getTelegramCode(req, res) {
   const { generateLinkCode } = require('../services/telegram/commands');
 
-  const user = await User.findOne({ id: req.user.id });
-  if (!user) return res.status(401).json({ error: 'Sessiya yaroqsiz — qaytadan kiring' });
+  const user = req.dbUser;
 
   if (!user.telegram) user.telegram = {};
 
@@ -203,8 +203,7 @@ async function getTelegramCode(req, res) {
 
 /** Telegram bog'lanishini uzish */
 async function unlinkTelegram(req, res) {
-  const user = await User.findOne({ id: req.user.id });
-  if (!user) return res.status(401).json({ error: 'Sessiya yaroqsiz — qaytadan kiring' });
+  const user = req.dbUser;
 
   user.telegram.chatId = '';
   user.telegram.linkCode = '';
@@ -214,7 +213,24 @@ async function unlinkTelegram(req, res) {
   res.json({ success: true, message: 'Telegram uzildi' });
 }
 
+/**
+ * Chiqish — token avlodini oshiradi.
+ *
+ * JWT ni "o'chirib" bo'lmaydi, shuning uchun avlod raqami oshiriladi:
+ * shu paytgacha berilgan barcha tokenlar keyingi so'rovdayoq rad etiladi.
+ * Ya'ni bu "hamma qurilmadan chiqish" ham hisoblanadi.
+ */
+async function logout(req, res) {
+  const user = req.dbUser;
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  await user.save();
+
+  logger.info(`Chiqish: ${user.phone}`);
+  res.json({ success: true, message: 'Hisobdan chiqdingiz' });
+}
+
 module.exports = {
+  logout: asyncHandler(logout),
   getTelegramCode: asyncHandler(getTelegramCode),
   unlinkTelegram: asyncHandler(unlinkTelegram),
   register: asyncHandler(register),

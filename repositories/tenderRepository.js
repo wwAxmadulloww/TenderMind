@@ -2,6 +2,7 @@
 
 const { Tender } = require('../models');
 const { TENDERS_SEED } = require('../seed-tenders');
+const { searchRegex } = require('../utils/searchQuery');
 
 function normalizeTender(tender) {
   if (!tender) return null;
@@ -27,15 +28,15 @@ function buildFilter({ soha, hudud, status, search } = {}) {
   if (soha && soha !== 'all') filter.soha = soha;
   if (hudud && hudud !== 'all') filter.hudud = hudud;
   if (status && status !== 'all') filter.status = status;
-  if (search) {
-    const q = String(search).trim();
-    if (q) {
-      filter.$or = [
-        { title: new RegExp(q, 'i') },
-        { org: new RegExp(q, 'i') },
-        { tags: new RegExp(q, 'i') },
-      ];
-    }
+  // Foydalanuvchi kiritmasi hech qachon to'g'ridan-to'g'ri RegExp ga
+  // bermaydi — "C++" kabi oddiy so'rov ham serverni yiqitardi.
+  const pattern = searchRegex(search);
+  if (pattern) {
+    filter.$or = [
+      { title: pattern },
+      { org: pattern },
+      { tags: pattern },
+    ];
   }
   return filter;
 }

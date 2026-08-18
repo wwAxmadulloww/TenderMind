@@ -19,6 +19,10 @@ const UserSchema = new mongoose.Schema({
   company: { type: String, default: '' },
   passwordHash: { type: String, required: true },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  // Token avlodi. Chiqish yoki parol o'zgarganda oshiriladi — shu paytgacha
+  // berilgan barcha tokenlar darhol kuchsizlanadi. Busiz "Chiqish" faqat
+  // brauzerdagi nusxani o'chirardi, o'g'irlangan token 30 kun ishlayverardi.
+  tokenVersion: { type: Number, default: 0 },
   plan: { type: String, enum: ['free', 'pro', 'corporate'], default: 'free' },
   planExpiresAt: { type: Date, default: null },
   savedTenders: { type: [String], default: [] },

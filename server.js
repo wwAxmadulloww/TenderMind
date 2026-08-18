@@ -45,8 +45,28 @@ const isGeminiConfigured = () => aiManager.isConfigured();
 // va bitta foydalanuvchi limitni tugatsa — hamma bloklanadi.
 if (isProd) app.set('trust proxy', 1);
 
+// Content Security Policy yoqilgan. Bu XSS ga qarshi oxirgi to'siq:
+// tender sarlavhalari tashqi manbadan keladi, ya'ni ular ishonchsiz matn.
+// Inline `onclick` hech qayerda ishlatilmaydi — barcha hodisalar
+// delegatsiya orqali ulanadi, shuning uchun 'unsafe-inline' kerak emas.
 app.use(helmet({
-  contentSecurityPolicy: false,  // flexible for inline onclick handlers in landing page
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      // Shriftlar Google Fonts dan; uslub faylini u yerdan olish uchun
+      // inline emas, aniq manba ko'rsatiladi.
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      upgradeInsecureRequests: isProd ? [] : null,
+    },
+  },
   crossOriginEmbedderPolicy: false,
 }));
 

@@ -168,7 +168,7 @@ async function renderTenders(container, page = 1) {
   container.innerHTML = `
     <div class="admin-view-head">
       <h2 class="admin-h2">Tenderlar <span class="admin-count">${data.total}</span></h2>
-      <button class="admin-btn primary" onclick="openTenderForm()">+ Yangi tender</button>
+      <button class="admin-btn primary" data-action="new-tender">+ Yangi tender</button>
     </div>
 
     <div id="tender-form-slot"></div>
@@ -191,8 +191,8 @@ async function renderTenders(container, page = 1) {
               ${t.isDemo ? '<span class="admin-pill demo">DEMO</span>' : '<span class="admin-pill real">Haqiqiy</span>'}
             </td>
             <td class="admin-actions-cell">
-              <button class="admin-btn ghost small" onclick="openLotForm('${t.id}')">+ Lot</button>
-              <button class="admin-btn danger small" onclick="removeTender('${t.id}')">O'chirish</button>
+              <button class="admin-btn ghost small" data-action="new-lot" data-id="${esc(t.id)}">+ Lot</button>
+              <button class="admin-btn danger small" data-action="remove-tender" data-id="${esc(t.id)}">O'chirish</button>
             </td>
           </tr>`).join('')}
       </tbody>
@@ -202,7 +202,7 @@ async function renderTenders(container, page = 1) {
       <div class="admin-pagination">
         ${Array.from({ length: data.pages }, (_, i) => i + 1).map(p => `
           <button class="admin-page ${p === data.page ? 'active' : ''}"
-                  onclick="renderTenders(document.getElementById('view-tenders'), ${p})">${p}</button>
+                  data-action="page-tenders" data-page="${p}">${p}</button>
         `).join('')}
       </div>` : ''}
   `;
@@ -210,7 +210,7 @@ async function renderTenders(container, page = 1) {
 
 function openTenderForm() {
   document.getElementById('tender-form-slot').innerHTML = `
-    <form class="admin-form" onsubmit="saveTender(event)">
+    <form class="admin-form" data-form="tender">
       <h3>Yangi tender</h3>
       <div class="admin-form-grid">
         <label>Nomi *<input name="title" required placeholder="Maktablar uchun parta yetkazib berish"></label>
@@ -230,7 +230,7 @@ function openTenderForm() {
         <label class="admin-form-wide">Manba havolasi<input name="sourceUrl" placeholder="https://..."></label>
       </div>
       <div class="admin-form-actions">
-        <button type="button" class="admin-btn ghost" onclick="document.getElementById('tender-form-slot').innerHTML=''">Bekor</button>
+        <button type="button" class="admin-btn ghost" data-action="cancel-form">Bekor</button>
         <button type="submit" class="admin-btn primary">Saqlash</button>
       </div>
     </form>`;
@@ -252,7 +252,7 @@ async function saveTender(event) {
 
 function openLotForm(tenderId) {
   document.getElementById('tender-form-slot').innerHTML = `
-    <form class="admin-form" onsubmit="saveLot(event, '${tenderId}')">
+    <form class="admin-form" data-form="lot" data-tender="${esc(tenderId)}">
       <h3>Yangi lot</h3>
       <div class="admin-form-grid">
         <label>Lot nomi *<input name="title" required></label>
@@ -265,7 +265,7 @@ function openLotForm(tenderId) {
         <label class="admin-form-wide">Talablar (vergul bilan)<input name="requirements" placeholder="3+ yil tajriba, ISO sertifikati"></label>
       </div>
       <div class="admin-form-actions">
-        <button type="button" class="admin-btn ghost" onclick="document.getElementById('tender-form-slot').innerHTML=''">Bekor</button>
+        <button type="button" class="admin-btn ghost" data-action="cancel-form">Bekor</button>
         <button type="submit" class="admin-btn primary">Saqlash</button>
       </div>
     </form>`;
@@ -321,12 +321,14 @@ async function renderUsers(container, page = 1) {
             <td><span class="admin-pill plan-${esc(u.plan)}">${esc(u.plan)}</span></td>
             <td>${date(u.planExpiresAt)}</td>
             <td class="admin-actions-cell">
-              <select class="admin-mini-select" onchange="changePlan('${u.id}', this.value, this)">
+              <select class="admin-mini-select" data-action="change-plan" data-id="${esc(u.id)}">
                 <option value="">Tarif...</option>
                 <option value="free">free</option>
                 <option value="pro">pro (1 oy)</option>
                 <option value="corporate">corporate (1 oy)</option>
               </select>
+              <button class="admin-btn ghost small" data-action="reset-password"
+                      data-id="${esc(u.id)}" data-name="${esc(u.name)}">Parolni tiklash</button>
             </td>
           </tr>`).join('')}
       </tbody>
@@ -336,7 +338,7 @@ async function renderUsers(container, page = 1) {
       <div class="admin-pagination">
         ${Array.from({ length: data.pages }, (_, i) => i + 1).map(p => `
           <button class="admin-page ${p === data.page ? 'active' : ''}"
-                  onclick="renderUsers(document.getElementById('view-users'), ${p})">${p}</button>
+                  data-action="page-users" data-page="${p}">${p}</button>
         `).join('')}
       </div>` : ''}
   `;
@@ -388,8 +390,8 @@ async function renderSubs(container) {
             <td><span class="admin-pill status-${esc(s.status)}">${esc(s.status)}</span></td>
             <td class="admin-actions-cell">
               ${s.status === 'pending' ? `
-                <button class="admin-btn primary small" onclick="approveSub('${s.id}')">Tasdiqlash</button>
-                <button class="admin-btn danger small" onclick="rejectSub('${s.id}')">Rad etish</button>
+                <button class="admin-btn primary small" data-action="approve-sub" data-id="${esc(s.id)}">Tasdiqlash</button>
+                <button class="admin-btn danger small" data-action="reject-sub" data-id="${esc(s.id)}">Rad etish</button>
               ` : '—'}
             </td>
           </tr>`).join('')}
@@ -439,6 +441,65 @@ async function refreshPendingBadge() {
     }
   } catch {
     // jimgina — badge muhim emas
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// HODISALARNI DELEGATSIYA QILISH
+// Inline `onclick` ishlatilmaydi — u Content Security Policy tomonidan
+// bloklanadi. Barcha tugmalar `data-action` bilan belgilanadi.
+// ══════════════════════════════════════════════════════════════════════
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]');
+  if (!el || el.tagName === 'SELECT') return;
+
+  const { action, id, page, name } = el.dataset;
+
+  const handlers = {
+    logout: () => adminLogout(),
+    'new-tender': () => openTenderForm(),
+    'new-lot': () => openLotForm(id),
+    'remove-tender': () => removeTender(id),
+    'cancel-form': () => { document.getElementById('tender-form-slot').innerHTML = ''; },
+    'page-tenders': () => renderTenders(document.getElementById('view-tenders'), Number(page)),
+    'page-users': () => renderUsers(document.getElementById('view-users'), Number(page)),
+    'approve-sub': () => approveSub(id),
+    'reject-sub': () => rejectSub(id),
+    'reset-password': () => resetPassword(id, name),
+  };
+
+  handlers[action]?.();
+});
+
+document.addEventListener('change', (e) => {
+  const el = e.target.closest('[data-action="change-plan"]');
+  if (el) changePlan(el.dataset.id, el.value, el);
+});
+
+document.addEventListener('submit', (e) => {
+  const form = e.target;
+  if (form.id === 'admin-login-form') return adminLogin(e);
+  if (form.dataset.form === 'tender') return saveTender(e);
+  if (form.dataset.form === 'lot') return saveLot(e, form.dataset.tender);
+});
+
+// Bo'lim yorliqlari — `data-view` allaqachon markupda bor
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('.admin-tab[data-view]');
+  if (tab) showAdminView(tab.dataset.view);
+});
+
+/** Foydalanuvchi parolini tiklash — vaqtinchalik parol beriladi */
+async function resetPassword(userId, userName) {
+  if (!confirm(`${userName} uchun yangi vaqtinchalik parol yaratilsinmi?\n\nEski parol ishlamay qoladi va barcha sessiyalari yopiladi.`)) return;
+
+  try {
+    const result = await api(`/api/admin/users/${userId}/reset-password`, { method: 'POST' });
+    // Parol faqat shu yerda bir marta ko'rsatiladi
+    window.prompt(result.message, result.temporaryPassword);
+    toast('Vaqtinchalik parol yaratildi', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
   }
 }
 

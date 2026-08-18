@@ -1,7 +1,5 @@
 'use strict';
 
-const { User } = require('../models');
-
 /**
  * Admin huquqini tekshirish.
  *
@@ -13,14 +11,14 @@ const { User } = require('../models');
  */
 async function requireAdmin(req, res, next) {
   try {
-    const user = await User.findOne({ id: req.user.id });
+    // authMiddleware foydalanuvchini yuklab, tokenini tekshirib qo'ygan
+    const user = req.dbUser;
     if (!user) return res.status(401).json({ error: 'Sessiya yaroqsiz — qaytadan kiring' });
 
     if (user.role !== 'admin') {
       return res.status(403).json({ error: 'Bu bo\'lim faqat administratorlar uchun' });
     }
 
-    req.dbUser = user;
     return next();
   } catch (err) {
     return next(err);

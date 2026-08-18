@@ -201,7 +201,14 @@ function persistSession(data) {
   renderAuthState();
 }
 
-function signOut({ silent = false } = {}) {
+async function signOut({ silent = false } = {}) {
+  // Serverga xabar beramiz — u token avlodini oshiradi va shu paytgacha
+  // berilgan barcha tokenlar kuchsizlanadi. Xato bo'lsa ham lokal
+  // sessiyani baribir tozalaymiz: foydalanuvchi chiqqanini kutadi.
+  if (state.token && !silent) {
+    await apiJson('/api/auth/logout', { method: 'POST' }).catch(() => {});
+  }
+
   state.token = '';
   state.user = null;
   state.savedIds.clear();
@@ -848,15 +855,23 @@ $('#password-form').addEventListener('submit', async (e) => {
   const error = $('#password-error');
   error.textContent = '';
   try {
-    await apiJson('/api/auth/change-password', {
+    const data = await apiJson('/api/auth/change-password', {
       method: 'PUT', auth: true,
       body: JSON.stringify({
         currentPassword: e.target.currentPassword.value,
         newPassword: e.target.newPassword.value,
       }),
     });
+
+    // Parol almashgach eski tokenlar bekor qilinadi — server yangisini
+    // beradi, aks holda foydalanuvchi o'z amalidan keyin tashqarida qolardi.
+    if (data.token) {
+      state.token = data.token;
+      localStorage.setItem('tm_token', data.token);
+    }
+
     e.target.reset();
-    toast(t('account.passwordChanged'), 'success');
+    toast(data.message || t('account.passwordChanged'), 'success');
   } catch (err) {
     error.textContent = err.message;
   }
@@ -1057,17 +1072,49 @@ function renderGlossary(terms) {
     </div>`).join('');
 }
 
-/** Matndagi lug'at atamalarini belgilaydi — ustiga bosilsa izoh chiqadi */
+/**
+ * Matndagi lug'at atamalarini belgilaydi — ustiga bosilsa izoh chiqadi.
+ *
+ * Muhim tartib: atamalar XOM matnda qidiriladi, qochirish esa keyin
+ * qo'llanadi. Avval qochirilsa, "qo'shimcha" matnda "qo&#39;shimcha"
+ * bo'lib qoladi va apostrofli atamalar (masalan "Boshlang'ich narx")
+ * hech qachon topilmasdi.
+ */
 function withTerms(text) {
-  let html = esc(text);
-  if (!state.glossary.length) return html;
+  const raw = String(text ?? '');
+  if (!state.glossary.length) return esc(raw);
 
-  for (const entry of state.glossary) {
-    const pattern = new RegExp(`\\b(${entry.aliases.map(escapeRe).join('|')})\\b`, 'iu');
-    html = html.replace(pattern, (match) =>
-      `<button type="button" class="term" data-term="${esc(entry.term)}">${match}</button>`);
+  // Bir joyda bitta atama belgilanadi: bo'laklarga ajratib, faqat
+  // atamalarni tugmaga o'raymiz, qolganini oddiy matn sifatida qochiramiz.
+  const aliases = state.glossary.flatMap(entry =>
+    entry.aliases.map(alias => ({ alias, term: entry.term })));
+
+  // Uzunroq alias avval — "lotlarni" ni "lot" dan oldin topsin
+  aliases.sort((a, b) => b.alias.length - a.alias.length);
+
+  const pattern = new RegExp(`(${aliases.map(a => escapeRe(a.alias)).join('|')})`, 'giu');
+  const byAlias = new Map(aliases.map(a => [a.alias.toLowerCase(), a.term]));
+
+  let result = '';
+  let lastIndex = 0;
+  const seen = new Set();
+
+  for (const match of raw.matchAll(pattern)) {
+    const term = byAlias.get(match[0].toLowerCase());
+    result += esc(raw.slice(lastIndex, match.index));
+
+    // Har bir atama matnda faqat bir marta belgilanadi — aks holda
+    // bir xil so'z har jumlada tugmaga aylanib, o'qishga xalaqit beradi.
+    if (term && !seen.has(term)) {
+      seen.add(term);
+      result += `<button type="button" class="term" data-term="${esc(term)}">${esc(match[0])}</button>`;
+    } else {
+      result += esc(match[0]);
+    }
+    lastIndex = match.index + match[0].length;
   }
-  return html;
+
+  return result + esc(raw.slice(lastIndex));
 }
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
