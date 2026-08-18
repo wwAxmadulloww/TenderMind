@@ -27,7 +27,7 @@ Haqiqiy baza bilan ishlash uchun `.env` da `MONGODB_URI` ni to'ldiring va `npm s
 | `npm start` | Serverni ishga tushirish |
 | `npm run dev` | Avtomatik qayta yuklanadigan rejim |
 | `npm run dev:local` | Xotiradagi MongoDB bilan (Atlas kerak emas) |
-| `npm test` | Testlar (124 ta) |
+| `npm test` | Testlar (138 ta) |
 | `npm run ingest -- file --path=./data/namuna-tenderlar.json` | Ma'lumot import qilish |
 | `npm run bot` | Telegram botni ishga tushirish |
 | `npm run make-admin -- +998901234567` | Foydalanuvchini admin qilish |
@@ -51,6 +51,7 @@ services/
 controllers/           So'rovlarni qayta ishlash
 routes/                Yo'llar va middleware zanjiri
 middleware/            auth, admin, quota, dbReady
+utils/                 asyncHandler, aiJson, searchQuery
 data/                  Lug'at, yo'riqnoma, namuna ma'lumot
 scripts/               CLI vositalar
 tests/                 Testlar (node:test + xotiradagi MongoDB)
@@ -116,6 +117,17 @@ SPA mazmuni JavaScript'siz ko'rinmaydi, shuning uchun har bir tender uchun alohi
 `config/plans.js` da — narx, imkoniyat va limitlar bir joyda. Sayt narxlar bo'limi shu manbadan render qilinadi, ya'ni reklama va amaldagi limit har doim mos.
 
 Limit **muvaffaqiyatli so'rovdan keyin** sarflanadi: AI xato bersa yoki javob keshdan kelsa — limit yonmaydi.
+
+### Xavfsizlik
+
+| Chora | Nima qiladi |
+|---|---|
+| **Token avlodi** | Chiqish yoki parol o'zgarishida oshiriladi — eski tokenlar darhol kuchsizlanadi. "Hamma qurilmadan chiqish" ham shu. |
+| **CSP** | `script-src 'self'`, inline skript yo'q. Tender sarlavhalari tashqi manbadan keladi, ya'ni ishonchsiz matn — bu oxirgi to'siq. |
+| **Qidiruv tozalash** | Foydalanuvchi kiritmasi hech qachon `new RegExp()` ga bermaydi. Busiz oddiy `C++` so'rovi ham serverni yiqitardi. |
+| **Rol bazadan** | Har so'rovda tekshiriladi, tokendan olinmaydi. |
+
+Parolni unutgan foydalanuvchi uchun admin vaqtinchalik parol yaratadi (`/admin` → Foydalanuvchilar). O'z-o'zini tiklash SMS yetkazishni talab qiladi — u ulanmagan, shuning uchun yolg'on "kod yubordik" xabari o'rniga ishlaydigan yo'l qoldirilgan.
 
 ### Admin panel — `/admin`
 Statistika, tender/lot qo'shish va o'chirish, foydalanuvchi tariflari, to'lov tasdiqlash.
@@ -194,7 +206,7 @@ AI kalitlari **formati bo'yicha** tekshiriladi (`gsk_`, `sk-`, `AIza`). Noto'g'r
 npm test
 ```
 
-124 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
+138 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
 
 Qamrov: telefon normalizatsiyasi, tarif limitlari, AI kalit validatsiyasi, route himoyasi, baza uzilgandagi xatti-harakat, lot tushuntirish, ta'lim moduli, admin huquqi, to'lov oqimi, ingestion normalizatsiyasi va dedupe, robots.txt qoidalari, Telegram buyruqlari, SEO sahifalari va indekslash qoidalari.
 

@@ -16,7 +16,7 @@
     <div class="admin-login-box">
       <h1>TenderMind Admin</h1>
       <p class="admin-login-sub">Boshqaruv paneliga kirish</p>
-      <form onsubmit="adminLogin(event)">
+      <form id="admin-login-form">
         <div class="field">
           <label class="field-label">Telefon</label>
           <input type="tel" id="admin-phone" class="input" placeholder="+998901234567" required>
@@ -43,15 +43,15 @@
       <div class="admin-header-right">
         <span id="admin-who" class="admin-who"></span>
         <a href="/" class="admin-btn ghost small">Saytga</a>
-        <button class="admin-btn ghost small" onclick="adminLogout()">Chiqish</button>
+        <button class="admin-btn ghost small" data-action="logout">Chiqish</button>
       </div>
     </header>
 
     <nav class="admin-nav">
-      <button class="admin-tab active" data-view="dashboard" onclick="showAdminView('dashboard')">Boshqaruv</button>
-      <button class="admin-tab" data-view="tenders" onclick="showAdminView('tenders')">Tenderlar</button>
-      <button class="admin-tab" data-view="users" onclick="showAdminView('users')">Foydalanuvchilar</button>
-      <button class="admin-tab" data-view="subs" onclick="showAdminView('subs')">
+      <button class="admin-tab active" data-view="dashboard">Boshqaruv</button>
+      <button class="admin-tab" data-view="tenders">Tenderlar</button>
+      <button class="admin-tab" data-view="users">Foydalanuvchilar</button>
+      <button class="admin-tab" data-view="subs">
         Obunalar <span id="subs-badge" class="admin-badge" style="display:none"></span>
       </button>
     </nav>

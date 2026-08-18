@@ -1,6 +1,5 @@
 'use strict';
 
-const { User } = require('../models');
 const logger = require('../logger');
 
 /**
@@ -18,7 +17,8 @@ const logger = require('../logger');
 function requireQuota(kind) {
   return async function quotaMiddleware(req, res, next) {
     try {
-      const user = await User.findOne({ id: req.user.id });
+      // authMiddleware foydalanuvchini yuklab qo'ygan — qayta izlamaymiz
+      const user = req.dbUser;
       if (!user) return res.status(401).json({ error: 'Sessiya yaroqsiz — qaytadan kiring' });
 
       if (!user.canUse(kind)) {
@@ -34,8 +34,6 @@ function requireQuota(kind) {
           limit: limitValue,
         });
       }
-
-      req.dbUser = user;
 
       res.on('finish', () => {
         if (res.statusCode >= 400) return;

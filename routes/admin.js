@@ -29,6 +29,7 @@ router.delete('/lots/:id', adminController.deleteLot);
 // Foydalanuvchilar
 router.get('/users', adminController.listUsers);
 router.put('/users/:id/plan', adminController.updateUserPlan);
+router.post('/users/:id/reset-password', adminController.resetUserPassword);
 
 // Obunalar
 router.get('/subscriptions', adminController.listSubscriptions);

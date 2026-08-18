@@ -32,6 +32,7 @@ function normalizeAuthPhone(req, res, next) {
 router.post('/register', authRegisterSanitize, normalizeAuthPhone, validateBody(registerRules), authController.register);
 router.post('/login', normalizeAuthPhone, validateBody(loginRules), authController.login);
 router.get('/me', authMiddleware, authController.getProfile);
+router.post('/logout', authMiddleware, authController.logout);
 router.put('/change-password', authMiddleware, authController.changePassword);
 router.put('/profile', authMiddleware, authController.updateProfile);
 

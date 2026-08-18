@@ -4,6 +4,9 @@ const { User, Tender, Lot, Subscription } = require('../models');
 const tenderRepository = require('../repositories/tenderRepository');
 const lotRepository = require('../repositories/lotRepository');
 const billing = require('../services/billing');
+const { searchRegex } = require('../utils/searchQuery');
+const bcrypt = require('bcryptjs');
+const crypto = require('node:crypto');
 const asyncHandler = require('../utils/asyncHandler');
 const logger = require('../logger');
 
@@ -42,7 +45,8 @@ async function listTenders(req, res) {
   const filter = {};
   if (req.query.isDemo === 'true') filter.isDemo = true;
   if (req.query.isDemo === 'false') filter.isDemo = false;
-  if (req.query.search) filter.title = new RegExp(String(req.query.search).trim(), 'i');
+  const titlePattern = searchRegex(req.query.search);
+  if (titlePattern) filter.title = titlePattern;
 
   const [total, items] = await Promise.all([
     Tender.countDocuments(filter),
@@ -165,9 +169,9 @@ async function listUsers(req, res) {
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
   const filter = {};
   if (req.query.plan) filter.plan = req.query.plan;
-  if (req.query.search) {
-    const q = String(req.query.search).trim();
-    filter.$or = [{ name: new RegExp(q, 'i') }, { phone: new RegExp(q, 'i') }, { company: new RegExp(q, 'i') }];
+  const userPattern = searchRegex(req.query.search);
+  if (userPattern) {
+    filter.$or = [{ name: userPattern }, { phone: userPattern }, { company: userPattern }];
   }
 
   const [total, users] = await Promise.all([
@@ -203,6 +207,42 @@ async function updateUserPlan(req, res) {
 
   logger.info(`Admin ${req.dbUser.phone} tarifni o'zgartirdi: ${user.phone} → ${plan}`);
   res.json({ success: true, user: { id: user.id, plan: user.plan, planExpiresAt: user.planExpiresAt } });
+}
+
+/**
+ * Parolni tiklash — vaqtinchalik parol beradi.
+ *
+ * Nega admin orqali: o'z-o'zini tiklash uchun SMS yoki email yetkazish
+ * kerak, u esa hali ulanmagan. Yolg'on "kod yubordik" xabari berish
+ * o'rniga ishlaydigan yo'l qoldirilgan — foydalanuvchi qo'llab-quvvatlash
+ * xizmatiga murojaat qiladi, admin vaqtinchalik parol beradi.
+ *
+ * Vaqtinchalik parol JAVOBDA bir marta ko'rsatiladi va bazada faqat
+ * hash saqlanadi. Token avlodi oshiriladi — eski sessiyalar yopiladi.
+ */
+async function resetUserPassword(req, res) {
+  const user = await User.findOne({ id: req.params.id });
+  if (!user) return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+
+  // Chalkashtiradigan belgilarsiz (0/O, 1/I/l) — telefonda aytish oson
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let temporary = '';
+  for (let i = 0; i < 10; i += 1) {
+    temporary += alphabet[crypto.randomInt(alphabet.length)];
+  }
+
+  user.passwordHash = await bcrypt.hash(temporary, 10);
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  await user.save();
+
+  logger.info(`Admin ${req.dbUser.phone} parolni tikladi: ${user.phone}`);
+
+  res.json({
+    success: true,
+    temporaryPassword: temporary,
+    message: 'Vaqtinchalik parol yaratildi. Uni foydalanuvchiga yetkazing — '
+      + 'bu yerda boshqa ko\'rsatilmaydi. Foydalanuvchi kirgach parolini o\'zgartirsin.',
+  });
 }
 
 // ── OBUNALAR ──────────────────────────────────────────────────────────
@@ -256,6 +296,7 @@ module.exports = {
   deleteLot: asyncHandler(deleteLot),
   listUsers: asyncHandler(listUsers),
   updateUserPlan: asyncHandler(updateUserPlan),
+  resetUserPassword: asyncHandler(resetUserPassword),
   listSubscriptions: asyncHandler(listSubscriptions),
   approveSubscription: asyncHandler(approveSubscription),
   rejectSubscription: asyncHandler(rejectSubscription),
