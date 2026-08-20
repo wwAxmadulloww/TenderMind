@@ -56,18 +56,76 @@ async function listTenders(req, res) {
   res.json({ total, page, limit, pages: Math.ceil(total / limit), items });
 }
 
+/**
+ * Sana `YYYY-MM-DD` shaklida va HAQIQIY kun bo'lishi shart.
+ *
+ * Bazada deadline matn sifatida saqlanadi va hamma joyda shu shaklda
+ * solishtiriladi. Tekshiruvsiz "salom-dunyo" ham yozilaverardi va u
+ * matn taqqoslashda istalgan sanadan katta chiqib, muddati tugagan
+ * e'lonlar filtridan o'tib ketardi; JSON-LD ga esa Google rad etadigan
+ * `availabilityEnds` yozilardi.
+ */
+function invalidDate(value, field) {
+  const text = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return `${field} "YYYY-MM-DD" shaklida bo'lishi kerak (masalan 2026-12-31)`;
+  }
+  const parsed = new Date(`${text}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== text) {
+    return `${field} mavjud sana emas: ${text}`;
+  }
+  return null;
+}
+
+/**
+ * E'lon identifikatori manzilning bir qismi bo'ladi (`/tender/:id`) va
+ * sitemap.xml ga tushadi. Shuning uchun u faqat manzilda xavfsiz
+ * belgilardan iborat bo'lishi kerak — aks holda "../../etc/passwd" kabi
+ * qiymat sitemapga buzuq `<loc>` bo'lib yozilardi va e'lon havola
+ * orqali umuman ochilmasdi.
+ */
+const ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,49}$/;
+
+function validateTenderFields(body, { requireAll }) {
+  const problems = [];
+
+  if (requireAll) {
+    const required = ['title', 'soha', 'hudud', 'org', 'budgetRaw', 'deadline'];
+    const missing = required.filter(field => !body[field]);
+    if (missing.length) {
+      problems.push(`Majburiy maydonlar to'ldirilmagan: ${missing.join(', ')}`);
+    }
+  }
+
+  if (body.id !== undefined && !ID_PATTERN.test(String(body.id))) {
+    problems.push('ID faqat kichik harf, raqam va chiziqchadan iborat bo\'lsin (masalan: it-001)');
+  }
+
+  for (const field of ['deadline', 'postedDate']) {
+    if (body[field] !== undefined && body[field] !== '') {
+      const problem = invalidDate(body[field], field);
+      if (problem) problems.push(problem);
+    }
+  }
+
+  if (body.budgetRaw !== undefined) {
+    const budgetRaw = Number(body.budgetRaw);
+    if (!Number.isFinite(budgetRaw) || budgetRaw <= 0) {
+      problems.push('Byudjet musbat son bo\'lishi kerak');
+    }
+  }
+
+  return problems;
+}
+
 async function createTender(req, res) {
   const body = req.body || {};
-  const required = ['title', 'soha', 'hudud', 'org', 'budgetRaw', 'deadline'];
-  const missing = required.filter(field => !body[field]);
-  if (missing.length) {
-    return res.status(400).json({ error: `Majburiy maydonlar to'ldirilmagan: ${missing.join(', ')}` });
+  const problems = validateTenderFields(body, { requireAll: true });
+  if (problems.length) {
+    return res.status(400).json({ error: problems[0], problems });
   }
 
   const budgetRaw = Number(body.budgetRaw);
-  if (!Number.isFinite(budgetRaw) || budgetRaw <= 0) {
-    return res.status(400).json({ error: 'Byudjet musbat son bo\'lishi kerak' });
-  }
 
   const tender = await Tender.create({
     ...body,
@@ -91,6 +149,14 @@ async function updateTender(req, res) {
 
   // id va createdBy ni tashqaridan o'zgartirishga yo'l qo'ymaymiz
   const { id, createdBy, _id, ...updatable } = req.body || {};
+
+  // Yaratishdagi tekshiruvlar tahrirda ham amal qiladi — aks holda
+  // yaroqli e'lonni keyin yaroqsiz sana bilan buzib qo'yish mumkin edi.
+  const problems = validateTenderFields(updatable, { requireAll: false });
+  if (problems.length) {
+    return res.status(400).json({ error: problems[0], problems });
+  }
+
   Object.assign(tender, updatable);
   if (updatable.budgetRaw) {
     tender.budget = updatable.budget || new Intl.NumberFormat('uz-UZ').format(Number(updatable.budgetRaw));

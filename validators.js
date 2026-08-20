@@ -84,24 +84,30 @@ function validate(data, rules) {
       continue;
     }
     
+    // Birinchi topilgan xato saqlanadi va keyingilari uni bosmaydi.
+    // Ilgari umumiy "kamida N belgi" xabari qoida bergan aniq
+    // `errorMsg` ni almashtirib yuborardi — foydalanuvchi nimani
+    // noto'g'ri yozganini bilmay qolardi.
+    const fail = (message) => {
+      if (!errors[field]) errors[field] = message;
+    };
+
     // Check format
-    if (rule.format && validators[rule.format]) {
-      if (!validators[rule.format](value)) {
-        errors[field] = rule.errorMsg || `${field} noto'g'ri format`;
-      }
+    if (rule.format && validators[rule.format] && !validators[rule.format](value)) {
+      fail(rule.errorMsg || `${field} noto'g'ri format`);
     }
-    
+
     // Check length
     if (rule.minLength && value.length < rule.minLength) {
-      errors[field] = `${field} kamida ${rule.minLength} belgida bo'lishi kerak`;
+      fail(`${field} kamida ${rule.minLength} belgida bo'lishi kerak`);
     }
     if (rule.maxLength && value.length > rule.maxLength) {
-      errors[field] = `${field} ko'pi bilan ${rule.maxLength} belgida bo'lishi kerak`;
+      fail(`${field} ko'pi bilan ${rule.maxLength} belgida bo'lishi kerak`);
     }
-    
+
     // Check custom validator
     if (rule.custom && !rule.custom(value)) {
-      errors[field] = rule.errorMsg || `${field} yaroqsiz`;
+      fail(rule.errorMsg || `${field} yaroqsiz`);
     }
   }
   

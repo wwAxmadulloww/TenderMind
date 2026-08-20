@@ -5,6 +5,12 @@
  *
  * Narxlar shu yerda — kodning boshqa joyida qo'lda yozilmasin.
  * `limits` db.js dagi getPlanLimits() bilan mos bo'lishi shart.
+ *
+ * QOIDA: bu ro'yxatda faqat HAQIQATDA farq qiladigan narsa yoziladi.
+ * Ilgari Pro "Tenderlarni taqqoslash" va "G'alaba strategiyasi" ni
+ * sotardi, holbuki ikkalasi ham bepul tarifda ochiq edi — kod ularni
+ * hech qachon cheklamagan. Pul to'lagan odam allaqachon tekin bo'lgan
+ * narsani olsa, bu tarifga emas, mahsulotga ishonchni yo'qotadi.
  */
 
 const PLANS = {
@@ -13,11 +19,13 @@ const PLANS = {
     name: 'Bepul',
     priceMonthly: 0,
     currency: 'UZS',
-    description: 'Sinab ko\'rish va o\'rganish uchun',
+    description: 'Tenderni o\'rganish va qatnashish uchun — yetarli',
     features: [
-      'Barcha tenderlar va lotlarni ko\'rish',
-      'Lotlarni oddiy tilda tushuntirish',
+      'Barcha tenderlar va lotlarni ko\'rish — cheksiz',
+      'Lotlarni oddiy tilda tushuntirish — cheksiz',
       '"Menga mos keladimi?" tahlili — cheksiz',
+      'Tenderlarni taqqoslash va g\'alaba strategiyasi',
+      'Atamalar lug\'ati va boshlang\'ich yo\'riqnoma',
       'Kuniga 1 ta AI hujjat to\'plami',
       'Kuniga 10 ta AI maslahat xabari',
     ],
@@ -30,10 +38,8 @@ const PLANS = {
     description: 'Muntazam tenderda qatnashadiganlar uchun',
     features: [
       'Bepul tarifdagi hamma narsa',
-      'Kuniga 99 ta AI hujjat to\'plami',
-      'Kuniga 100 ta AI maslahat xabari',
-      'Tenderlarni taqqoslash',
-      'G\'alaba strategiyasi',
+      'Kuniga 99 ta AI hujjat to\'plami — bepulda 1 ta',
+      'Kuniga 100 ta AI maslahat xabari — bepulda 10 ta',
     ],
   },
   corporate: {
@@ -44,7 +50,7 @@ const PLANS = {
     description: 'Jamoa bilan ishlaydigan kompaniyalar uchun',
     features: [
       'Pro tarifdagi hamma narsa',
-      'Kuniga 200 ta AI maslahat xabari',
+      'Kuniga 200 ta AI maslahat xabari — Pro da 100 ta',
       'Ustuvor qo\'llab-quvvatlash',
     ],
   },

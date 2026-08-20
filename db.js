@@ -23,6 +23,17 @@ const UserSchema = new mongoose.Schema({
   // berilgan barcha tokenlar darhol kuchsizlanadi. Busiz "Chiqish" faqat
   // brauzerdagi nusxani o'chirardi, o'g'irlangan token 30 kun ishlayverardi.
   tokenVersion: { type: Number, default: 0 },
+
+  // Telefon tasdiqlash va parolni tiklash. Kod ochiq saqlanmaydi —
+  // faqat hash, muddat va urinishlar soni.
+  phoneVerified: { type: Boolean, default: false },
+  verification: {
+    codeHash: { type: String, default: '' },
+    purpose: { type: String, enum: ['phone', 'reset', ''], default: '' },
+    expiresAt: { type: Date, default: null },
+    attempts: { type: Number, default: 0 },
+    lastSentAt: { type: Date, default: null },
+  },
   plan: { type: String, enum: ['free', 'pro', 'corporate'], default: 'free' },
   planExpiresAt: { type: Date, default: null },
   savedTenders: { type: [String], default: [] },
@@ -58,10 +69,15 @@ const UserSchema = new mongoose.Schema({
 
 // Plan limitlari
 UserSchema.methods.getPlanLimits = function () {
+  // Faqat AMALDA tekshiriladigan limitlar. Ilgari bu yerda `searches`,
+  // `compare` va `strategy` ham bor edi — ular mijozga yuborilardi va
+  // narxlar sahifasida sotilardi, lekin hech qayerda tekshirilmasdi:
+  // bepul foydalanuvchi ham taqqoslash va strategiyadan bemalol
+  // foydalanardi. Tekshirilmaydigan limit — limit emas, va'da.
   const limits = {
-    free:      { docPerDay: 1,  chatPerDay: 10,  searches: 3,  compare: false, strategy: false },
-    pro:       { docPerDay: 99, chatPerDay: 100, searches: 999, compare: true,  strategy: true  },
-    corporate: { docPerDay: 99, chatPerDay: 200, searches: 999, compare: true,  strategy: true  },
+    free:      { docPerDay: 1,  chatPerDay: 10  },
+    pro:       { docPerDay: 99, chatPerDay: 100 },
+    corporate: { docPerDay: 99, chatPerDay: 200 },
   };
   return limits[this.plan] || limits.free;
 };

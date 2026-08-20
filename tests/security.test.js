@@ -47,6 +47,36 @@ test('sanitizeSearch — uzunlik cheklanadi', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════
+// Eksport hajmi chegarasi
+// ══════════════════════════════════════════════════════════════════════
+const { checkExportSize, MAX_DOC_CHARS, MAX_TOTAL_CHARS } = require('../controllers/exportController');
+
+test('Odatdagi hajmdagi hujjatlar o\'tadi', () => {
+  const docs = { ariza: 'a'.repeat(5000), texnik: 'b'.repeat(8000) };
+  assert.strictEqual(checkExportSize({ docs }), null);
+});
+
+test('Bitta juda uzun hujjat rad etiladi', () => {
+  const docs = { ariza: 'a'.repeat(MAX_DOC_CHARS + 1) };
+  assert.ok(checkExportSize({ docs }), 'chegaradan oshgan hujjat rad etilishi kerak');
+});
+
+test('Alohida kichik, lekin birgalikda katta hujjatlar rad etiladi', () => {
+  const perDoc = MAX_DOC_CHARS - 1;
+  const docs = {};
+  // Har biri chegarada, lekin yig'indisi umumiy chegaradan oshadi
+  for (let i = 0; i < Math.ceil(MAX_TOTAL_CHARS / perDoc) + 1; i += 1) {
+    docs['d' + i] = 'x'.repeat(perDoc);
+  }
+  const problem = checkExportSize({ docs });
+  assert.ok(problem && problem.includes('birgalikda'));
+});
+
+test('Bo\'sh mazmun chegaradan o\'tadi — uni boshqa tekshiruv ushlaydi', () => {
+  assert.strictEqual(checkExportSize({ content: '' }), null);
+});
+
+// ══════════════════════════════════════════════════════════════════════
 // Integratsion: token bekor qilish, qidiruv, parol tiklash
 // ══════════════════════════════════════════════════════════════════════
 let mongod, server, base, db;

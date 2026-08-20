@@ -10,13 +10,58 @@ Loyihaning maqsadi: tender sohasini bilmagan odam ham qatnasha olsin. Shuning uc
 
 ```bash
 npm install
-cp .env.example .env    # qiymatlarni to'ldiring
-npm run dev:local       # MongoDB Atlas kerak emas — xotirada ishlaydi
+npm run dev:local
 ```
 
 `http://localhost:3002` ochiladi. Lokal admin hisobi konsolda ko'rsatiladi.
 
-Haqiqiy baza bilan ishlash uchun `.env` da `MONGODB_URI` ni to'ldiring va `npm start`.
+**Tashqi baza kerak emas.** `dev:local` MongoDB ni o'zi ko'taradi va ma'lumotni `.data/mongo` da **saqlaydi** — yaratgan tenderlaringiz va foydalanuvchilar server qayta ishga tushganda ham joyida qoladi.
+
+```bash
+npm run dev:local -- --fresh   # bazani tozalab boshlash
+```
+
+`npm start` esa `.env` dagi `MONGODB_URI` ga ulanadi. Agar u ishlamasa, server ishga tushadi, lekin **bazaga bog'liq har bir so'rov 503 qaytaradi** — sayt ochiladi, tenderlar kelmaydi, kirish ishlamaydi. Buni ishga tushirish logi aniq aytadi.
+
+---
+
+## Ma'lumot manbasi — xarid.uzex.uz
+
+`xarid.uz` javob bermaydi. Amaldagi rasmiy portal — **xarid.uzex.uz**.
+
+U Angular ilovasi, ya'ni sahifadan matn qirqib olish behuda: mazmun JavaScript ishlagandan keyin paydo bo'ladi. Ortida esa ochiq JSON API turadi:
+
+| Endpoint | Nima beradi |
+|---|---|
+| `POST /Common/GetMinimizedLotsList` | Ochiq lotlar ro'yxati (`{"from":1,"to":20}`) |
+| `GET /Common/GetLot/{id}` | Lotning to'liq tafsiloti |
+| `POST /Common/GetCompletedDeals` | Tugagan bitimlar |
+| `GET /Lib/GetRegions`, `/Lib/GetCategories` | Ma'lumotnomalar |
+
+Sahifalash `from`/`to` — 1 dan boshlanadigan, ikki tomoni ham kiradigan oraliq. Har javobda `total_count` bor.
+
+Tafsilotda hamma narsa bor: buyurtmachi, mahsulot ro'yxati (`js_details`), yetkazib berish shartlari (`js_conditions`), boshlang'ich narx, kafolat puli, hudud, aloqa. Ya'ni lotni tushuntirish va hujjat tayyorlash uchun yetarli.
+
+### Nega adapter hozir ishlamaydi
+
+API **o'zini tanitgan mijozni rad etadi**:
+
+```
+User-Agent: TenderMind-Bot/1.0 (+https://tendermind.uz/bot)
+→ 500 {"message": "Приложение : Missing User-Agent header"}
+```
+
+Xabar chalg'ituvchi — sarlavha yuborilgan. Rad etilish sababi: u brauzernikiga o'xshamaydi. `curl`, `python-requests`, hatto `Googlebot` ham shu javobni oladi; faqat to'liq Chrome satri o'tadi. Bu buzuq parser emas, **ataylab qo'yilgan bot filtri**.
+
+Undan o'tish uchun brauzer bo'lib ko'rinish kerak bo'lardi. Loyiha bunday qilmaydi: portal egasi kirishni ataylab cheklagan bo'lsa, uni aldab o'tish — ochiq ma'lumot yig'ish emas, to'siqni chetlab o'tish.
+
+**To'g'ri yo'l:** UzEx bilan rasmiy kelishuv. Moslashtirish kodi (`services/ingestion/sources/uzex.js`) va uning testlari tayyor — ruxsat berilgan zahoti ishlab ketadi.
+
+**Hozircha:** portaldan qo'lda yuklab olingan eksportni kiritish mumkin:
+
+```bash
+npm run ingest -- file --path=./data/eksport.json
+```
 
 ---
 
@@ -27,7 +72,7 @@ Haqiqiy baza bilan ishlash uchun `.env` da `MONGODB_URI` ni to'ldiring va `npm s
 | `npm start` | Serverni ishga tushirish |
 | `npm run dev` | Avtomatik qayta yuklanadigan rejim |
 | `npm run dev:local` | Xotiradagi MongoDB bilan (Atlas kerak emas) |
-| `npm test` | Testlar (138 ta) |
+| `npm test` | Testlar (188 ta) |
 | `npm run ingest -- file --path=./data/namuna-tenderlar.json` | Ma'lumot import qilish |
 | `npm run bot` | Telegram botni ishga tushirish |
 | `npm run make-admin -- +998901234567` | Foydalanuvchini admin qilish |
@@ -75,7 +120,11 @@ Foydalanuvchi tenderga emas, **lotga** taklif beradi. Har bir lotda:
 - **"Oddiy tilda tushuntir"** — nima sotib olinmoqda, kim qatnasha oladi, qanday hujjat kerak, qancha pul, qachongacha.
 - **"Menga mos keladimi?"** — muddat, tajriba, litsenziya, hudud bo'yicha avtomatik tekshiruv.
 
-Tushuntirish **AI ulanmagan bo'lsa ham to'liq ishlaydi** — lot ma'lumotidan quriladi, AI faqat boyitadi. Bir marta yaratilib saqlanadi, keyingi ochilishlarda AI qayta chaqirilmaydi.
+Tushuntirish **AI ulanmagan bo'lsa ham to'liq ishlaydi** — lot ma'lumotidan quriladi, AI faqat boyitadi.
+
+Asosiy variant **lot yaratilishi bilan** tayyorlanadi, chunki u na tarmoq, na pul, na limit talab qiladi. Shuning uchun u ro'yxatdan o'tmagan mehmonga ham darhol ko'rinadi — ilgari u faqat kirgan foydalanuvchi tugmani bosganda va kunlik limit sarflanganda yaratilardi, ya'ni mahsulotning asosiy va'dasi birinchi tashrifda umuman ko'rinmasdi.
+
+Server render qiladigan sahifalarga ham shu matn tushadi — qidiruv tizimi uchun ham foydali.
 
 ### Ta'lim qatlami
 - 18 ta atama lug'ati — matnda uchraganda bosilsa izoh va hayotiy misol chiqadi.
@@ -93,6 +142,16 @@ Yo'nalish — **rasmiy hujjat**: oq qog'oz, muhr siyohi ko'k (`--seal`), ma'lumo
 Serif tasodifiy tanlanmagan: rasmiy hujjat va uni tushuntirayotgan odam — ikki xil ovoz, shuning uchun ikki xil harf. Tushuntirish paneli (`.plain`) shu tufayli sahifada alohida ajralib turadi — bu mahsulotning asosiy g'oyasi.
 
 Barcha rang va o'lcham qiymatlari `assets/css/core.css` da CSS o'zgaruvchilari sifatida. Boshqa faylda qo'lda rang yozilmaydi.
+
+**Bosh ekrandagi namuna kartasi** — bezak emas: chapda rasmiy e'lon, pastda uning odam tilidagi izohi. Tashrif buyuruvchi birinchi ekrandayoq mahsulot nima qilishini ko'radi. Karta «NAMUNA» deb belgilangan, chunki u haqiqiy e'londan farq qilmaydi.
+
+**Soha ranglari** ham bezak emas: o'nlab e'lonni ko'z bilan chopib chiqayotgan odam kerakli sohani chap chiziq rangi bo'yicha topadi.
+
+**Muddat ko'rsatkichi** faqat 45 kundan kam qolganda ko'rinadi. Har doim ko'rinsa u har doim to'la bo'lardi va hech narsa bildirmasdi — chiziq paydo bo'lishining o'zi «bu e'lon tugayapti» degani.
+
+**Bosh sahifadagi uchala raqam ham o'lchanadi.** Soha va hudud soni ilgari lug'atdagi kalitlar sonidan olinardi: bazada bironta ham qurilish e'loni bo'lmasa ham «9 soha» deb turaverardi. Haqiqiy son yonida turgan o'ylab topilgan son ikkalasiga ham ishonchni yo'qotadi.
+
+**Soha filtridagi sanoq** ham shundan: odam bo'sh sohani bosib, bo'sh ro'yxatni ko'rib qaytmasligi uchun.
 
 ### Tillar
 Interfeys **uz / ru / en**. O'zbekiston biznesida rus tili keng ishlatiladi, shuning uchun RU to'liq qo'llab-quvvatlanadi.
@@ -113,10 +172,20 @@ SPA mazmuni JavaScript'siz ko'rinmaydi, shuning uchun har bir tender uchun alohi
 
 **DEMO yozuvlar `noindex` bilan chiqadi** — o'ylab topilgan tender qidiruv natijalariga tushmasligi kerak. Muddati tugaganlar ham shunday.
 
+### E'lon holati — sanadan hisoblanadi
+
+`status` bazada saqlanadi, lekin u faqat bitta savolga javob beradi: **e'lon qo'lda yopilganmi?** Faol / shoshilinch / tugagan — har doim `deadline` dan hisoblanadi.
+
+Sababi oddiy: saqlangan holatni hech kim yangilab turmaydi. Ilgari muddati o'tgan e'lon abadiy «faol» bo'lib qolardi va odam qatnasha olmaydigan tenderni ko'rardi; «Shoshilinch» filtri esa qo'lda yozilgan yorliqni qaytarardi — eng tez tugaydigan e'lon unga tushmasdi.
+
+Bir joyda hisoblanadi (`repositories/tenderRepository.js`) va API, kategoriya sahifasi hamda sitemap shu bitta shartdan foydalanadi.
+
 ### Tarif va limitlar
 `config/plans.js` da — narx, imkoniyat va limitlar bir joyda. Sayt narxlar bo'limi shu manbadan render qilinadi, ya'ni reklama va amaldagi limit har doim mos.
 
 Limit **muvaffaqiyatli so'rovdan keyin** sarflanadi: AI xato bersa yoki javob keshdan kelsa — limit yonmaydi.
+
+Ro'yxatda **faqat amalda tekshiriladigan** farq yoziladi. Ilgari Pro «Tenderlarni taqqoslash» va «G'alaba strategiyasi» ni sotardi, holbuki ikkalasi bepul tarifda ham ochiq edi — kod ularni hech qachon cheklamagan. Tekshirilmaydigan limit — limit emas, va'da.
 
 ### Xavfsizlik
 
@@ -127,7 +196,21 @@ Limit **muvaffaqiyatli so'rovdan keyin** sarflanadi: AI xato bersa yoki javob ke
 | **Qidiruv tozalash** | Foydalanuvchi kiritmasi hech qachon `new RegExp()` ga bermaydi. Busiz oddiy `C++` so'rovi ham serverni yiqitardi. |
 | **Rol bazadan** | Har so'rovda tekshiriladi, tokendan olinmaydi. |
 
-Parolni unutgan foydalanuvchi uchun admin vaqtinchalik parol yaratadi (`/admin` → Foydalanuvchilar). O'z-o'zini tiklash SMS yetkazishni talab qiladi — u ulanmagan, shuning uchun yolg'on "kod yubordik" xabari o'rniga ishlaydigan yo'l qoldirilgan.
+**Cheklovlar** (`config/index.js` → `rateLimits`): ro'yxatdan o'tish soatiga 5, kirish 15 daqiqada 10 (muvaffaqiyatli kirish sanalmaydi), SMS kodi soatiga 5. Test muhitida ular ataylab yuqori — barcha testlar bitta IP dan keladi.
+
+### SMS: telefon tasdiqlash va parolni tiklash
+`.env` da Eskiz.uz yoki Play Mobile kaliti bo'lsa yoqiladi:
+
+- **Parolni unutdim** — kirish oynasida havola, SMS kodi bilan yangi parol o'rnatiladi
+- **Telefonni tasdiqlash** — sozlamalarda
+
+Kod 6 xonali, 5 daqiqa amal qiladi, 5 ta noto'g'ri urinishdan keyin bloklanadi. Bazada faqat hash saqlanadi.
+
+`forgot-password` **raqam bazada bor-yo'qligini oshkor qilmaydi** — javob har doim bir xil, aks holda bu endpoint foydalanuvchilar ro'yxatini yig'ish vositasiga aylanardi.
+
+Kalit yo'q bo'lsa interfeys buni ochiq aytadi. Development uchun `SMS_CONSOLE=true` — kod SMS o'rniga logga yoziladi.
+
+Kalit umuman bo'lmasa, admin `/admin` → Foydalanuvchilar bo'limida vaqtinchalik parol bera oladi.
 
 ### Admin panel — `/admin`
 Statistika, tender/lot qo'shish va o'chirish, foydalanuvchi tariflari, to'lov tasdiqlash.
@@ -206,7 +289,7 @@ AI kalitlari **formati bo'yicha** tekshiriladi (`gsk_`, `sk-`, `AIza`). Noto'g'r
 npm test
 ```
 
-138 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
+188 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
 
 Qamrov: telefon normalizatsiyasi, tarif limitlari, AI kalit validatsiyasi, route himoyasi, baza uzilgandagi xatti-harakat, lot tushuntirish, ta'lim moduli, admin huquqi, to'lov oqimi, ingestion normalizatsiyasi va dedupe, robots.txt qoidalari, Telegram buyruqlari, SEO sahifalari va indekslash qoidalari.
 

@@ -23,6 +23,20 @@ const config = {
   frontendUrl: String(process.env.FRONTEND_URL || '').trim(),
   corsOrigins: splitCsv(process.env.CORS_ORIGINS || process.env.FRONTEND_URL),
   logLevel: process.env.LOG_LEVEL || 'info',
+  // Cheklovlar. Test muhitida yuqori — barcha testlar bitta IP dan
+  // keladi va haqiqiy qiymatlar bilan ular bir-birini bloklaydi.
+  // Limitlarning o'zi tests/rate-limit.test.js da tekshiriladi.
+  rateLimits: env === 'test'
+    ? { register: 1000, login: 1000, smsCode: 1000, auth: 5000 }
+    : { register: 5, login: 10, smsCode: 5, auth: 60 },
+  sms: {
+    eskizEmail: String(process.env.ESKIZ_EMAIL || '').trim(),
+    eskizPassword: String(process.env.ESKIZ_PASSWORD || '').trim(),
+    playMobileLogin: String(process.env.PLAYMOBILE_LOGIN || '').trim(),
+    playMobilePassword: String(process.env.PLAYMOBILE_PASSWORD || '').trim(),
+    // Development da SMS o'rniga konsolga yozish
+    useConsole: process.env.SMS_CONSOLE === 'true',
+  },
   ai: {
     groqApiKey: String(process.env.GROQ_API_KEY || '').trim(),
     openAIApiKey: String(process.env.OPENAI_API_KEY || '').trim(),

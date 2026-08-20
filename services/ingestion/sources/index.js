@@ -2,6 +2,7 @@
 
 const fileSource = require('./file');
 const httpJsonSource = require('./httpJson');
+const uzexSource = require('./uzex');
 
 /**
  * Manbalar reyestri.
@@ -13,6 +14,7 @@ const httpJsonSource = require('./httpJson');
 const registry = new Map([
   [fileSource.name, fileSource],
   [httpJsonSource.name, httpJsonSource],
+  [uzexSource.name, uzexSource],
 ]);
 
 module.exports = {

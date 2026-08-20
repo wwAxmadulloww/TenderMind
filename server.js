@@ -10,7 +10,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+const { authLimiter } = require('./middleware/rateLimits');
 const path = require('path');
 const logger = require('./logger');
 const config = require('./config');
@@ -88,11 +88,20 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 // sahifaning o'zi statik fayl (unda maxfiy ma'lumot yo'q).
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
-// Rate limiter for general Auth endpoints
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 60,
-  message: { error: 'Juda ko\'p so\'rov. 15 daqiqadan keyin urinib ko\'ring.' }
+
+// ── API javoblari keshlanmasin ────────────────────────────────────────
+// Express `res.json` da faqat ETag qo'yadi, `Cache-Control` esa umuman
+// yo'q edi. Bunday javobni brauzer "evristik yangilik" qoidasi bo'yicha
+// qayta so'ramasdan keshdan berishi mumkin — natijada bosh sahifadagi
+// e'lonlar soni bazada 27 bo'lganda ham 25 bo'lib turaverardi.
+// Foydalanuvchiga tegishli javoblar (limit, saqlanganlar) va sog'liq
+// tekshiruvi esa umuman keshlanmasligi kerak.
+//
+// Indekslanadigan sahifalar `/api` da emas — ular o'z Cache-Control ini
+// alohida belgilaydi va bu qoida ularga tegmaydi.
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
 });
 
 // ── Health Check Endpoint ─────────────────────────────────────────────
@@ -111,7 +120,7 @@ app.get('/api/health', (req, res) => {
 // ── Mount Routers ─────────────────────────────────────────────────────
 // Bazaga bog'liq routerlar o'z ichida requireDB ni chaqiradi (routes/*.js),
 // shuning uchun bu yerda faqat mount qilinadi. Eksport bazaga bog'liq emas.
-app.use('/api/auth', apiLimiter, authRouter);
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api', tendersRouter);
 app.use('/api', lotsRouter);
 app.use('/api', learnRouter);
@@ -145,6 +154,11 @@ app.use((err, req, res, next) => {
     ...(!isProd && { stack: err.stack })
   });
 });
+
+/** Loglarda parol ko'rinmasin */
+function maskUri(uri) {
+  return String(uri).replace(/(mongodb(?:\+srv)?:\/\/[^:]+:)[^@]*/, '$1***');
+}
 
 // ── Startup Config Validation ─────────────────────────────────────────
 function validateStartupConfig() {
@@ -198,6 +212,13 @@ async function startServer() {
       const createdLots = await lotRepository.backfillFromTenders();
       if (createdLots > 0) logger.info(`${createdLots} ta tender uchun lot yaratildi`);
 
+      // Tushuntirishsiz qolgan lotlarga asosiy variantni yozamiz —
+      // AI chaqirilmaydi, shuning uchun bu tekin va har ishga
+      // tushishda xavfsiz. Busiz "Oddiy tilda" tugmasi ro'yxatdan
+      // o'tmagan mehmon uchun hech narsa qaytarmasdi.
+      const explained = await lotRepository.backfillExplanations();
+      if (explained > 0) logger.info(`${explained} ta lotga oddiy tildagi tushuntirish yozildi`);
+
       // Muddati o'tgan obunalarni yopish (server har ko'tarilganda)
       const expired = await billing.expireOutdatedSubscriptions();
       if (expired > 0) logger.info(`${expired} ta obuna muddati tugadi va yopildi`);
@@ -210,8 +231,22 @@ async function startServer() {
     logger.info(`TenderMind Server — http://localhost:${PORT}`);
     logger.info(`AI: ${isGeminiConfigured() ? `✅ ${aiManager.providerName()} ulandi` : '❌ AI API key kiriting'}`);
     logger.info(`Mode: ${process.env.NODE_ENV || 'development'}`);
-    logger.info(`MongoDB: ${isDBConnected() ? '✅ ulandi' : '❌ ulanmagan'}`);
-    if (isDBConnected()) logger.info(`Tenderlar: ${await tenderRepository.count()} ta ma'lumot bazada`);
+
+    if (isDBConnected()) {
+      logger.info(`MongoDB: ✅ ulandi`);
+      logger.info(`Tenderlar: ${await tenderRepository.count()} ta ma'lumot bazada`);
+    } else {
+      // Server ko'tariladi, lekin bazaga bog'liq har bir so'rov 503
+      // qaytaradi. Buni ishga tushirish paytida aniq aytish kerak —
+      // aks holda sayt "ishlayotgandek" ko'rinadi va faqat
+      // foydalanuvchi kirmoqchi bo'lganda muammo ma'lum bo'ladi.
+      logger.error('MongoDB: ❌ ULANMADI');
+      logger.error('Sayt ochiladi, lekin tenderlar, kirish va boshqa hammasi 503 qaytaradi.');
+      logger.error(config.mongodbUri
+        ? `MONGODB_URI ko'rsatilgan, lekin ulanib bo'lmadi: ${maskUri(config.mongodbUri)}`
+        : 'MONGODB_URI umuman sozlanmagan.');
+      logger.error('Yechim: tashqi bazasiz ishlash uchun →  npm run dev:local');
+    }
   });
 
   return server;

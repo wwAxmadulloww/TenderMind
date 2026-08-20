@@ -14,6 +14,7 @@ const requireDB = require('../middleware/dbReady');
 
 // Ochiq (autentifikatsiyasiz) — tenderlarni ko'rish hamma uchun erkin
 router.get('/tenders', requireDB, tenderController.listTenders);
+router.get('/stats', requireDB, tenderController.getStats);
 router.get('/tenders/:id', requireDB, tenderController.getTenderById);
 
 // Foydalanuvchiga bog'liq
