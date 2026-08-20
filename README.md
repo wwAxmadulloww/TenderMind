@@ -32,7 +32,7 @@ npm run dev:local -- --fresh   # bazani tozalab boshlash
 | `npm start` | Serverni ishga tushirish |
 | `npm run dev` | Avtomatik qayta yuklanadigan rejim |
 | `npm run dev:local` | Xotiradagi MongoDB bilan (Atlas kerak emas) |
-| `npm test` | Testlar (160 ta) |
+| `npm test` | Testlar (177 ta) |
 | `npm run ingest -- file --path=./data/namuna-tenderlar.json` | Ma'lumot import qilish |
 | `npm run bot` | Telegram botni ishga tushirish |
 | `npm run make-admin -- +998901234567` | Foydalanuvchini admin qilish |
@@ -80,7 +80,11 @@ Foydalanuvchi tenderga emas, **lotga** taklif beradi. Har bir lotda:
 - **"Oddiy tilda tushuntir"** — nima sotib olinmoqda, kim qatnasha oladi, qanday hujjat kerak, qancha pul, qachongacha.
 - **"Menga mos keladimi?"** — muddat, tajriba, litsenziya, hudud bo'yicha avtomatik tekshiruv.
 
-Tushuntirish **AI ulanmagan bo'lsa ham to'liq ishlaydi** — lot ma'lumotidan quriladi, AI faqat boyitadi. Bir marta yaratilib saqlanadi, keyingi ochilishlarda AI qayta chaqirilmaydi.
+Tushuntirish **AI ulanmagan bo'lsa ham to'liq ishlaydi** — lot ma'lumotidan quriladi, AI faqat boyitadi.
+
+Asosiy variant **lot yaratilishi bilan** tayyorlanadi, chunki u na tarmoq, na pul, na limit talab qiladi. Shuning uchun u ro'yxatdan o'tmagan mehmonga ham darhol ko'rinadi — ilgari u faqat kirgan foydalanuvchi tugmani bosganda va kunlik limit sarflanganda yaratilardi, ya'ni mahsulotning asosiy va'dasi birinchi tashrifda umuman ko'rinmasdi.
+
+Server render qiladigan sahifalarga ham shu matn tushadi — qidiruv tizimi uchun ham foydali.
 
 ### Ta'lim qatlami
 - 18 ta atama lug'ati — matnda uchraganda bosilsa izoh va hayotiy misol chiqadi.
@@ -105,6 +109,10 @@ Barcha rang va o'lcham qiymatlari `assets/css/core.css` da CSS o'zgaruvchilari s
 
 **Muddat ko'rsatkichi** faqat 45 kundan kam qolganda ko'rinadi. Har doim ko'rinsa u har doim to'la bo'lardi va hech narsa bildirmasdi — chiziq paydo bo'lishining o'zi «bu e'lon tugayapti» degani.
 
+**Bosh sahifadagi uchala raqam ham o'lchanadi.** Soha va hudud soni ilgari lug'atdagi kalitlar sonidan olinardi: bazada bironta ham qurilish e'loni bo'lmasa ham «9 soha» deb turaverardi. Haqiqiy son yonida turgan o'ylab topilgan son ikkalasiga ham ishonchni yo'qotadi.
+
+**Soha filtridagi sanoq** ham shundan: odam bo'sh sohani bosib, bo'sh ro'yxatni ko'rib qaytmasligi uchun.
+
 ### Tillar
 Interfeys **uz / ru / en**. O'zbekiston biznesida rus tili keng ishlatiladi, shuning uchun RU to'liq qo'llab-quvvatlanadi.
 
@@ -124,10 +132,20 @@ SPA mazmuni JavaScript'siz ko'rinmaydi, shuning uchun har bir tender uchun alohi
 
 **DEMO yozuvlar `noindex` bilan chiqadi** — o'ylab topilgan tender qidiruv natijalariga tushmasligi kerak. Muddati tugaganlar ham shunday.
 
+### E'lon holati — sanadan hisoblanadi
+
+`status` bazada saqlanadi, lekin u faqat bitta savolga javob beradi: **e'lon qo'lda yopilganmi?** Faol / shoshilinch / tugagan — har doim `deadline` dan hisoblanadi.
+
+Sababi oddiy: saqlangan holatni hech kim yangilab turmaydi. Ilgari muddati o'tgan e'lon abadiy «faol» bo'lib qolardi va odam qatnasha olmaydigan tenderni ko'rardi; «Shoshilinch» filtri esa qo'lda yozilgan yorliqni qaytarardi — eng tez tugaydigan e'lon unga tushmasdi.
+
+Bir joyda hisoblanadi (`repositories/tenderRepository.js`) va API, kategoriya sahifasi hamda sitemap shu bitta shartdan foydalanadi.
+
 ### Tarif va limitlar
 `config/plans.js` da — narx, imkoniyat va limitlar bir joyda. Sayt narxlar bo'limi shu manbadan render qilinadi, ya'ni reklama va amaldagi limit har doim mos.
 
 Limit **muvaffaqiyatli so'rovdan keyin** sarflanadi: AI xato bersa yoki javob keshdan kelsa — limit yonmaydi.
+
+Ro'yxatda **faqat amalda tekshiriladigan** farq yoziladi. Ilgari Pro «Tenderlarni taqqoslash» va «G'alaba strategiyasi» ni sotardi, holbuki ikkalasi bepul tarifda ham ochiq edi — kod ularni hech qachon cheklamagan. Tekshirilmaydigan limit — limit emas, va'da.
 
 ### Xavfsizlik
 
@@ -231,7 +249,7 @@ AI kalitlari **formati bo'yicha** tekshiriladi (`gsk_`, `sk-`, `AIza`). Noto'g'r
 npm test
 ```
 
-160 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
+177 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
 
 Qamrov: telefon normalizatsiyasi, tarif limitlari, AI kalit validatsiyasi, route himoyasi, baza uzilgandagi xatti-harakat, lot tushuntirish, ta'lim moduli, admin huquqi, to'lov oqimi, ingestion normalizatsiyasi va dedupe, robots.txt qoidalari, Telegram buyruqlari, SEO sahifalari va indekslash qoidalari.
 

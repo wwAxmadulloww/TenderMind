@@ -69,10 +69,15 @@ const UserSchema = new mongoose.Schema({
 
 // Plan limitlari
 UserSchema.methods.getPlanLimits = function () {
+  // Faqat AMALDA tekshiriladigan limitlar. Ilgari bu yerda `searches`,
+  // `compare` va `strategy` ham bor edi — ular mijozga yuborilardi va
+  // narxlar sahifasida sotilardi, lekin hech qayerda tekshirilmasdi:
+  // bepul foydalanuvchi ham taqqoslash va strategiyadan bemalol
+  // foydalanardi. Tekshirilmaydigan limit — limit emas, va'da.
   const limits = {
-    free:      { docPerDay: 1,  chatPerDay: 10,  searches: 3,  compare: false, strategy: false },
-    pro:       { docPerDay: 99, chatPerDay: 100, searches: 999, compare: true,  strategy: true  },
-    corporate: { docPerDay: 99, chatPerDay: 200, searches: 999, compare: true,  strategy: true  },
+    free:      { docPerDay: 1,  chatPerDay: 10  },
+    pro:       { docPerDay: 99, chatPerDay: 100 },
+    corporate: { docPerDay: 99, chatPerDay: 200 },
   };
   return limits[this.plan] || limits.free;
 };

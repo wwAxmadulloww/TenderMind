@@ -391,13 +391,27 @@
 }
 .filter-option:hover { background: var(--paper-sunk); color: var(--ink); }
 .filter-option[aria-pressed="true"] { background: var(--seal-tint); color: var(--seal); font-weight: 500; }
+.filter-option-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Soha yonidagi sanoq — odam bo'sh sohani bosib, bo'sh ro'yxatni
+   ko'rib qaytmasligi uchun. */
 .filter-option .count {
   margin-left: auto;
+  flex-shrink: 0;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 100px;
+  background: var(--paper-sunk);
   font-family: var(--font-data);
   font-size: var(--t-micro);
   color: var(--ink-3);
+  text-align: center;
 }
-.filter-option[aria-pressed="true"] .count { color: var(--seal); }
+.filter-option:hover .count { background: var(--rule); }
+.filter-option[aria-pressed="true"] .count { background: var(--paper-raised); color: var(--seal); }
+/* Hozircha e'loni yo'q soha — bosish mumkin, lekin ko'zni tortmaydi */
+.filter-option.is-empty { color: var(--ink-3); }
+.filter-option.is-empty .count { opacity: 0.6; }
 
 .filter-reset {
   font-size: var(--t-small);
@@ -427,27 +441,38 @@
 .row {
   position: relative;
   display: block;
-  padding: var(--s4) var(--s3) var(--s4) var(--s4);
+  padding: var(--s4) var(--s4) var(--s4) var(--s5);
   border-bottom: 1px solid var(--rule);
   transition: background-color 0.13s, box-shadow 0.13s;
 }
+
+/* Soha chizig'i — qatorning to'liq bo'yi. Ilgari u 3px va yarim shaffof
+   edi, tepa-pastidan bo'shliq qoldirardi: natijada tasodifiy chiziqchaga
+   o'xshab, hech qanday ma'no bermasdi. Endi qatorning qirrasi bo'lib
+   turadi va ro'yxatni ko'z bilan sohalarga ajratadi. */
 .row::before {
   content: '';
   position: absolute;
-  left: 0; top: var(--s4); bottom: var(--s4);
-  width: 3px;
-  border-radius: 2px;
+  left: 0; top: -1px; bottom: -1px;
+  width: 4px;
   background: var(--row-accent, var(--rule-strong));
-  opacity: 0.55;
-  transition: opacity 0.13s;
+  opacity: 0.75;
+  transition: opacity 0.13s, width 0.13s;
 }
 .row:hover {
   background: var(--paper-raised);
   box-shadow: var(--shadow-sm);
   text-decoration: none;
 }
-.row:hover::before { opacity: 1; }
+.row:hover::before { opacity: 1; width: 6px; }
 .row:hover .row-title { color: var(--seal); }
+
+/* Muddati tugagan e'lon ro'yxatda qolsa ham qatnasha olmaysiz —
+   bu ko'rinishdan ham sezilishi kerak. */
+.row.is-closed { background: var(--paper-sunk); }
+.row.is-closed::before { opacity: 0.3; }
+.row.is-closed .row-title,
+.row.is-closed .row-budget { color: var(--ink-2); }
 
 .row-top { display: flex; align-items: center; gap: var(--s2); margin-bottom: 5px; flex-wrap: wrap; }
 .row-sector {
@@ -478,17 +503,21 @@
 .row-dot { color: var(--rule-strong); }
 .row-region { font-size: var(--t-micro); color: var(--ink-3); }
 
+/* Sarlavha — ro'yxatdagi eng muhim matn. Ilgari u tavsif bilan bir xil
+   o'lchamda edi va ro'yxat bir tekis kulrang bo'lib ko'rinardi. */
 .row-title {
-  font-size: var(--t-body);
-  font-weight: 500;
-  line-height: 1.4;
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.011em;
   color: var(--ink);
   margin-bottom: 3px;
   transition: color 0.13s;
 }
 .row-org { font-size: var(--t-small); color: var(--ink-2); margin-bottom: var(--s3); }
 
-.row-facts { display: flex; align-items: center; gap: var(--s5); flex-wrap: wrap; }
+.row-facts { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; }
 .row-fact { display: flex; align-items: baseline; gap: 5px; }
 .row-fact-label { font-size: var(--t-micro); color: var(--ink-3); }
 .row-fact-value {
@@ -498,9 +527,59 @@
   color: var(--ink);
 }
 .row-fact-value.is-urgent { color: var(--urgent); font-weight: 600; }
-.row-budget { font-family: var(--font-data); font-size: var(--t-base); font-weight: 600; color: var(--ink); }
 
-.row-actions { margin-left: auto; display: flex; gap: var(--s1); }
+.row-budget {
+  font-family: var(--font-data);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+}
+/* "so'm" — birlik, summaning bir qismi emas: kichikroq va och */
+.row-budget i { font-style: normal; font-size: var(--t-micro); font-weight: 400; color: var(--ink-3); }
+
+/* Muddat — yorliq + qiymat emas, bitta o'qiladigan belgi.
+   Shoshilinch bo'lsa rangi bilan ajralib turadi. */
+.row-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 100px;
+  background: var(--paper-sunk);
+  font-family: var(--font-data);
+  font-size: var(--t-small);
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.row-clock svg { opacity: 0.7; }
+.row-clock.is-urgent { background: var(--urgent-tint); color: var(--urgent); font-weight: 600; }
+.row-clock.is-urgent svg { opacity: 1; }
+.row-clock.is-closed { background: var(--paper-sunk); color: var(--ink-3); text-decoration: line-through; }
+
+.row-actions { margin-left: auto; display: flex; align-items: center; gap: var(--s2); }
+
+/* "Oddiy tilda tushuntir" — mahsulotning butun g'oyasi shu tugmada.
+   Ilgari u savol belgisi shaklidagi 30px lik kulrang belgi edi va
+   e'tibordan chetda qolardi. Endi u nomi bilan turadi: har bir qator
+   mahsulot nima taklif qilayotganini o'zi aytadi. */
+.explain-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--seal-rule);
+  border-radius: 100px;
+  background: var(--paper-raised);
+  font-size: var(--t-small);
+  font-weight: 500;
+  color: var(--seal);
+  white-space: nowrap;
+  transition: background-color 0.13s, border-color 0.13s;
+}
+.explain-btn:hover { background: var(--seal-tint); border-color: var(--seal); }
+.explain-btn[aria-expanded="true"] { background: var(--seal); border-color: var(--seal); color: #fff; }
+
 .icon-btn {
   width: 30px; height: 30px;
   display: grid; place-items: center;
@@ -826,7 +905,11 @@
 @media (max-width: 720px) {
   :root { --t-hero: 30px; --t-h1: 25px; --t-h2: 20px; }
   .masthead-inner { padding: 5px var(--s4); gap: var(--s2); font-size: 10px; }
-  .masthead time { display: none; }
+  /* Sana tor ekranga sig'maydi. U bilan birga undan keyingi ajratgich
+     ham yashiriladi — aks holda ikki chiziq yonma-yon qolib, "|  |"
+     bo'lib ko'rinardi. */
+  .masthead time,
+  .masthead time + .masthead-sep { display: none; }
   .search-stats { width: 100%; }
   .search-stats > div { flex: 1; padding: var(--s3) var(--s3); text-align: center; }
   .hero-specimen { max-width: none; }
@@ -840,8 +923,26 @@
   .row-facts { gap: var(--s3); }
   .step { padding: var(--s4); padding-top: var(--s7); }
   .step::before { top: var(--s4); left: var(--s4); }
-  .chat { right: 0; bottom: 0; width: 100vw; height: 100vh; border-radius: 0; border: none; }
-  .chat-toggle { right: var(--s4); bottom: var(--s4); }
+  /* `dvh` — mobil brauzerning manzil paneli hisobga olinadi. `100vh`
+     bo'lsa oynaning pastki qismi panel ostida qolib, yopish tugmasi
+     va yozish maydoni ko'rinmasdi. */
+  .chat {
+    right: 0; bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0; border: none;
+  }
+  /* Tor ekranda yozuvli tugma mazmunning ustini yopib qo'yadi —
+     shuning uchun u faqat belgidan iborat dumaloq tugmaga aylanadi.
+     Nomi `aria-label` da qoladi, ya'ni ekran o'quvchi uchun yo'qolmaydi. */
+  .chat-toggle {
+    right: var(--s4); bottom: var(--s4);
+    width: 48px; height: 48px;
+    padding: 0;
+    justify-content: center;
+  }
+  .chat-toggle span { display: none; }
 }
 
 /* Mobil uchun pastki navigatsiya */

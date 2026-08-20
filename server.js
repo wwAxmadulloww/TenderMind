@@ -89,6 +89,21 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
 
+// ── API javoblari keshlanmasin ────────────────────────────────────────
+// Express `res.json` da faqat ETag qo'yadi, `Cache-Control` esa umuman
+// yo'q edi. Bunday javobni brauzer "evristik yangilik" qoidasi bo'yicha
+// qayta so'ramasdan keshdan berishi mumkin — natijada bosh sahifadagi
+// e'lonlar soni bazada 27 bo'lganda ham 25 bo'lib turaverardi.
+// Foydalanuvchiga tegishli javoblar (limit, saqlanganlar) va sog'liq
+// tekshiruvi esa umuman keshlanmasligi kerak.
+//
+// Indekslanadigan sahifalar `/api` da emas — ular o'z Cache-Control ini
+// alohida belgilaydi va bu qoida ularga tegmaydi.
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 // ── Health Check Endpoint ─────────────────────────────────────────────
 // Routerlardan OLDIN turishi shart: baza uzilganda ham javob berishi kerak,
 // aks holda monitoring "server o'lgan" deb xato xulosa qiladi.
@@ -196,6 +211,13 @@ async function startServer() {
       // Lotsiz eski tenderlar uchun bittadan lot yaratiladi (migratsiya).
       const createdLots = await lotRepository.backfillFromTenders();
       if (createdLots > 0) logger.info(`${createdLots} ta tender uchun lot yaratildi`);
+
+      // Tushuntirishsiz qolgan lotlarga asosiy variantni yozamiz —
+      // AI chaqirilmaydi, shuning uchun bu tekin va har ishga
+      // tushishda xavfsiz. Busiz "Oddiy tilda" tugmasi ro'yxatdan
+      // o'tmagan mehmon uchun hech narsa qaytarmasdi.
+      const explained = await lotRepository.backfillExplanations();
+      if (explained > 0) logger.info(`${explained} ta lotga oddiy tildagi tushuntirish yozildi`);
 
       // Muddati o'tgan obunalarni yopish (server har ko'tarilganda)
       const expired = await billing.expireOutdatedSubscriptions();

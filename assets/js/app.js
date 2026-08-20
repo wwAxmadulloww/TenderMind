@@ -26,6 +26,7 @@ const state = {
   glossary: [],
   plans: [],
   compareSelection: new Set(),
+  sectorCounts: {},
 };
 
 function safeParse(raw) {
@@ -486,9 +487,11 @@ function renderRow(item) {
   const progress = deadlineProgress(item.deadline);
   const saved = state.savedIds.has(item.id);
   const lotCount = item.lotCount || 1;
+  const left = daysLeft(item.deadline);
+  const closed = item.status === 'closed' || item.status === 'canceled';
 
   return `
-  <article class="row" role="listitem" data-id="${esc(item.id)}"
+  <article class="row${closed ? ' is-closed' : ''}" role="listitem" data-id="${esc(item.id)}"
            style="--row-accent: var(--s-${esc(item.soha || 'boshqa')})">
     <div class="row-top">
       <span class="row-sector">${esc(sectorName(item.soha))}</span>
@@ -499,15 +502,20 @@ function renderRow(item) {
       ${item.isVerified && !item.isDemo ? `<span class="chip chip-verified">${esc(t('row.verified'))}</span>` : ''}
     </div>
 
-    <a href="/tender/${esc(item.id)}" class="row-title" style="display:block">${esc(item.title)}</a>
+    <a href="/tender/${esc(item.id)}" class="row-title">${esc(item.title)}</a>
     <p class="row-org">${esc(item.org)}</p>
 
     <div class="row-facts">
-      <span class="row-budget">${esc(item.budget)} ${esc(t('row.som'))}</span>
+      <span class="row-budget">${esc(item.budget)} <i>${esc(t('row.som'))}</i></span>
 
-      <span class="row-fact">
-        <span class="row-fact-label">${esc(t('row.deadline'))}</span>
-        <span class="row-fact-value${deadline.urgent ? ' is-urgent' : ''}">${esc(deadline.text)}</span>
+      <!-- Muddat — narxdan keyingi eng muhim fakt, shuning uchun
+           yorliqdan ko'ra ko'rinadigan belgi bilan beriladi. -->
+      <span class="row-clock${deadline.urgent ? ' is-urgent' : ''}${closed ? ' is-closed' : ''}">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <circle cx="10" cy="10" r="7.4" stroke="currentColor" stroke-width="1.7"/>
+          <path d="M10 5.6V10l3 1.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+        ${esc(deadline.text)}
       </span>
 
       <span class="row-fact">
@@ -516,8 +524,17 @@ function renderRow(item) {
       </span>
 
       <span class="row-actions">
-        <button type="button" class="icon-btn" data-explain="${esc(item.id)}"
-                title="${esc(t('row.explain'))}" aria-label="${esc(t('row.explain'))}">?</button>
+        <!-- Mahsulotning asosiy va'dasi shu tugmada. Ilgari u savol
+             belgisi shaklidagi kichkina belgi edi va e'tibordan
+             butunlay chetda qolardi — endi nomi bilan turadi. -->
+        <button type="button" class="explain-btn" data-explain="${esc(item.id)}"
+                aria-expanded="false" aria-controls="explain-${esc(item.id)}"
+                title="${esc(t('row.explain'))}">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M3 4.5h14M3 9h10M3 13.5h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          ${esc(t('row.explainShort'))}
+        </button>
         <button type="button" class="icon-btn" data-save="${esc(item.id)}"
                 aria-pressed="${saved}" title="${esc(t(saved ? 'row.unsave' : 'row.save'))}"
                 aria-label="${esc(t('row.save'))}">
@@ -529,7 +546,8 @@ function renderRow(item) {
     </div>
 
     ${progress ? `
-    <div class="row-deadline-bar" aria-hidden="true">
+    <div class="row-deadline-bar" aria-hidden="true"
+         title="${esc(t('row.deadline'))}: ${esc(deadline.text)}">
       <div class="row-deadline-fill ${progress.state}" style="width:${progress.percent}%"></div>
     </div>` : ''}
 
@@ -581,7 +599,11 @@ async function toggleRowExplain(tenderId) {
   const box = document.getElementById(`explain-${tenderId}`);
   if (!box) return;
 
-  if (!box.hidden) { box.hidden = true; return; }
+  const button = $(`[data-explain="${CSS.escape(tenderId)}"]`);
+  const opening = box.hidden;
+  button?.setAttribute('aria-expanded', String(opening));
+
+  if (!opening) { box.hidden = true; return; }
 
   box.hidden = false;
   if (box.dataset.loaded) return;
@@ -613,11 +635,28 @@ async function toggleRowExplain(tenderId) {
  * qilinmay qolib ketardi.
  */
 function renderSectorFilter() {
-  const sectors = [['all', t('filter.all')], ...sectorKeys().map(k => [k, sectorName(k)])];
+  // Har soha yonida nechta ochiq e'lon borligi. Sanoqsiz ro'yxatda odam
+  // bo'sh sohani bosib, bo'sh natijani ko'rib qaytardi — sanoq bu
+  // urinishni butunlay ortiqcha qiladi.
+  const counts = state.sectorCounts;
+  const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+
+  // Sanoq hali kelmagan bo'lsa (birinchi chizish) — umuman ko'rsatmaymiz.
+  // Kelgan bo'lsa, bo'sh soha ochiq "0" bilan turadi: yozuvning yo'qligi
+  // "noma'lum" degan taassurot qoldiradi, "0" esa aniq javob.
+  const known = Object.keys(counts).length > 0;
+  const sectors = [
+    ['all', t('filter.all'), known ? total : null],
+    ...sectorKeys().map(k => [k, sectorName(k), known ? (counts[k] || 0) : null]),
+  ];
+
   $('#filter-sectors').innerHTML = sectors
-    .map(([key, name]) => `
-      <button type="button" class="filter-option" data-soha="${key}"
-              aria-pressed="${state.filters.soha === key}">${esc(name)}</button>`)
+    .map(([key, name, count]) => `
+      <button type="button" class="filter-option${count === 0 ? ' is-empty' : ''}" data-soha="${key}"
+              aria-pressed="${state.filters.soha === key}">
+        <span class="filter-option-name">${esc(name)}</span>
+        ${count != null ? `<span class="count">${count}</span>` : ''}
+      </button>`)
     .join('');
 
   $('#filter-region').innerHTML = `<option value="all">${esc(t('filter.allRegions'))}</option>`
@@ -1528,20 +1567,23 @@ function miniMarkdown(text) {
 // ═══════════════════════════════════════════════════════════════════
 async function loadStats() {
   try {
-    const [tenders, glossary] = await Promise.all([
-      apiJson('/api/tenders?limit=1&status=active'),
+    const [stats, glossary] = await Promise.all([
+      apiJson('/api/stats'),
       apiJson('/api/glossary').catch(() => ({ terms: [] })),
     ]);
 
     state.glossary = glossary.terms || [];
 
-    // Faqat serverdan kelgan haqiqiy son ko'rsatiladi. Lotlar soni uchun
-    // umumiy hisob endpointi yo'q — taxmin qilib yozish ma'lumotni
-    // soxtalashtirish bo'lardi, shuning uchun u ko'rsatilmaydi.
-    $('#stat-tenders').textContent = som(tenders.total);
-    renderMasthead(tenders.total);
-    $('#stat-sectors').textContent = String(sectorKeys().length);
-    $('#stat-regions').textContent = String(regionKeys().length);
+    // Uchala raqam ham bazadan o'lchanadi. Soha va hudud soni ilgari
+    // lug'atdagi kalitlar sonidan olinardi — bu o'lchov emas, va'da edi:
+    // bironta ham qurilish e'loni bo'lmasa ham "9 soha" deb turardi.
+    $('#stat-tenders').textContent = som(stats.open);
+    renderMasthead(stats.open);
+    $('#stat-sectors').textContent = String(stats.sohalar);
+    $('#stat-regions').textContent = String(stats.hududlar);
+
+    state.sectorCounts = stats.bySoha || {};
+    renderSectorFilter();
   } catch {
     $('#search-stats').hidden = true;
   }

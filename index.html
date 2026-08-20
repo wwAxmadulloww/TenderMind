@@ -537,7 +537,10 @@
 </div>
 
 <!-- ══ AI maslahatchi ════════════════════════════════════════════ -->
-<button type="button" class="chat-toggle" id="chat-toggle">
+<!-- Tor ekranda yozuv yashiriladi va tugma faqat belgidan iborat bo'ladi,
+     shuning uchun nomi `aria-label` da ham turishi shart. -->
+<button type="button" class="chat-toggle" id="chat-toggle"
+        data-i18n-attr="aria-label:chat.open" aria-label="Savolingiz bormi?">
   <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true">
     <path d="M3 5.5A2.5 2.5 0 015.5 3h9A2.5 2.5 0 0117 5.5v6a2.5 2.5 0 01-2.5 2.5H8l-4 3.5v-3.5H5.5A2.5 2.5 0 013 11.5z"
           stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>

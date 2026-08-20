@@ -106,34 +106,38 @@ test('"Menga mos keladimi?" — tokensiz ishlaydi va sabab qaytaradi', async () 
   assert.ok(data.fit.reasons.length > 0);
 });
 
-test('Tushuntirish — tokensiz 401, token bilan yaratiladi va keshlanadi', async () => {
-  const list = await fetch(`${base}/api/tenders?limit=1`);
-  const { items } = await list.json();
-  const lots = await (await fetch(`${base}/api/tenders/${items[0].id}/lots`)).json();
-  const lotId = lots.lots[0].id;
+test('Tushuntirish ro\'yxatdan o\'tmagan mehmonga ham darhol ko\'rinadi', async () => {
+  // Mahsulotning asosiy va'dasi shu. Ilgari tushuntirish faqat kirgan
+  // foydalanuvchi tugmani bosganda yaratilardi — ya'ni mehmon uchun
+  // hech qachon ko'rinmasdi. Endi u lot bilan birga tayyorlanadi.
+  const { items } = await (await fetch(`${base}/api/tenders?limit=1`)).json();
+  const { lots } = await (await fetch(`${base}/api/tenders/${items[0].id}/lots`)).json();
 
-  // Tokensiz — rad etiladi
+  const lot = lots[0];
+  assert.strictEqual(lot.hasExplanation, true, 'tokensiz ham tayyor bo\'lishi kerak');
+  assert.ok(lot.explanation.xulosa.length > 0, 'AI siz ham xulosa bo\'lishi shart');
+  assert.ok(lot.explanation.hujjatlar.length >= 3);
+  assert.ok(lot.explanation.nima && lot.explanation.kim && lot.explanation.pul);
+});
+
+test('Tushuntirishni QAYTA yaratish tokensiz mumkin emas', async () => {
+  const { items } = await (await fetch(`${base}/api/tenders?limit=1`)).json();
+  const { lots } = await (await fetch(`${base}/api/tenders/${items[0].id}/lots`)).json();
+  const lotId = lots[0].id;
+
+  // O'qish erkin, lekin AI sarflaydigan yaratish — himoyalangan
   const anon = await fetch(`${base}/api/lots/${lotId}/explain`, { method: 'POST' });
   assert.strictEqual(anon.status, 401);
 
-  // Token bilan — AI ulanmagan bo'lsa ham to'liq tushuntirish qaytadi
-  const first = await fetch(`${base}/api/lots/${lotId}/explain`, {
+  // Token bilan — tayyor tushuntirish keshdan qaytadi, AI chaqirilmaydi
+  const authed = await fetch(`${base}/api/lots/${lotId}/explain`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
-  assert.strictEqual(first.status, 200);
-  const firstData = await first.json();
-  assert.strictEqual(firstData.cached, false);
-  assert.ok(firstData.explanation.xulosa.length > 0, 'AI siz ham xulosa bo\'lishi shart');
-  assert.ok(firstData.explanation.hujjatlar.length >= 3);
-
-  // Ikkinchi marta — keshdan
-  const second = await fetch(`${base}/api/lots/${lotId}/explain`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const secondData = await second.json();
-  assert.strictEqual(secondData.cached, true, 'ikkinchi so\'rov keshdan kelishi kerak');
+  assert.strictEqual(authed.status, 200);
+  const data = await authed.json();
+  assert.strictEqual(data.cached, true, 'oldindan tayyorlangani uchun keshdan kelishi kerak');
+  assert.ok(data.explanation.xulosa.length > 0);
 });
 
 test('Kesh urilganda kunlik limit sarflanmaydi', async () => {

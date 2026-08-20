@@ -35,8 +35,10 @@ async function categoryPage(req, res) {
     return res.status(404).type('html').send(seo.renderNotFound());
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const tenders = await Tender.find({ soha, deadline: { $gte: today } })
+  // Ochiqlik shartini repozitoriy belgilaydi — ro'yxat sahifasi va API
+  // bir xil javob berishi kerak, aks holda kategoriya sahifasida
+  // ko'ringan e'lon qidiruvda topilmay qolardi.
+  const tenders = await Tender.find({ soha, ...tenderRepository.statusCondition('active') })
     .select('id title org hudud budget deadline isDemo')
     .sort({ deadline: 1 })
     .limit(100)
@@ -54,10 +56,10 @@ async function sitemap(req, res) {
     return res.type('xml').send(seo.renderSitemap([]));
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const open = tenderRepository.statusCondition('active');
   const tenders = await Tender.find({
     isDemo: { $ne: true },        // namunaviy yozuvlar qidiruvga tushmaydi
-    deadline: { $gte: today },    // muddati tugaganlari ham
+    ...open,                      // muddati tugaganlari ham
   })
     .select('id updatedAt')
     .sort({ updatedAt: -1 })
@@ -65,7 +67,7 @@ async function sitemap(req, res) {
     .lean();
 
   // Kategoriya sahifalari — faqat ichida yozuvi borlari
-  const sohalar = await Tender.distinct('soha', { deadline: { $gte: today } });
+  const sohalar = await Tender.distinct('soha', open);
 
   res.set('Cache-Control', 'public, max-age=3600');
   res.type('xml').send(seo.renderSitemap(tenders, sohalar));
