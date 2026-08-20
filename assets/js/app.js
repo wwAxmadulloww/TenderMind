@@ -27,6 +27,8 @@ const state = {
   plans: [],
   compareSelection: new Set(),
   sectorCounts: {},
+  currentTender: null,
+  currentLots: [],
 };
 
 function safeParse(raw) {
@@ -138,10 +140,21 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ── Ko'rinishlar (hash orqali — orqaga tugmasi ishlashi uchun) ──────
-const VIEWS = ['browse', 'docs', 'work', 'account', 'guide', 'plans'];
+const VIEWS = ['browse', 'docs', 'work', 'account', 'guide', 'plans', 'tender'];
 
-function go(view, { push = true } = {}) {
+/**
+ * Manzilni ko'rinish va parametrga ajratish.
+ * `#tender/it-001` → { view: 'tender', param: 'it-001' }
+ */
+function parseRoute(hash) {
+  const [view, param] = String(hash || '').replace(/^#/, '').split('/');
+  return { view: VIEWS.includes(view) ? view : 'browse', param: param || '' };
+}
+
+function go(view, { push = true, param = '' } = {}) {
   if (!VIEWS.includes(view)) view = 'browse';
+  // E'lon sahifasi identifikatorsiz ma'nosiz
+  if (view === 'tender' && !param) view = 'browse';
   state.view = view;
 
   $$('.view').forEach(v => v.classList.toggle('is-active', v.id === `view-${view}`));
@@ -153,13 +166,15 @@ function go(view, { push = true } = {}) {
     }
   });
 
-  if (push && location.hash !== `#${view}`) history.pushState({ view }, '', `#${view}`);
+  const target = param ? `#${view}/${param}` : `#${view}`;
+  if (push && location.hash !== target) history.pushState({ view, param }, '', target);
   window.scrollTo({ top: 0, behavior: 'instant' });
 
   if (view === 'work') loadWork();
   if (view === 'account') loadAccount();
   if (view === 'guide') loadGuide();
   if (view === 'plans') loadPlans();
+  if (view === 'tender') loadTender(param);
 }
 
 document.addEventListener('click', (e) => {
@@ -171,10 +186,22 @@ document.addEventListener('click', (e) => {
     openModal('auth-modal');
     return;
   }
-  go(view);
+  // Menyudan hujjatlarga o'tilsa — bu boshqa ish, oldingi lotning
+  // yorlig'i qolib ketmasin.
+  if (view === 'docs') clearDocsSource();
+  go(view, { param: link.dataset.param || '' });
 });
 
-window.addEventListener('popstate', () => go(location.hash.slice(1) || 'browse', { push: false }));
+/** Hujjat shakli qaysi lotdan to'ldirilganini bildiruvchi yorliqni olib tashlash */
+function clearDocsSource() {
+  const banner = $('#docs-from-lot');
+  if (banner) banner.hidden = true;
+}
+
+window.addEventListener('popstate', () => {
+  const { view, param } = parseRoute(location.hash);
+  go(view, { push: false, param });
+});
 
 // ═══════════════════════════════════════════════════════════════════
 // AUTENTIFIKATSIYA
@@ -502,7 +529,8 @@ function renderRow(item) {
       ${item.isVerified && !item.isDemo ? `<span class="chip chip-verified">${esc(t('row.verified'))}</span>` : ''}
     </div>
 
-    <a href="/tender/${esc(item.id)}" class="row-title">${esc(item.title)}</a>
+    <a href="#tender/${esc(item.id)}" class="row-title"
+       data-go="tender" data-param="${esc(item.id)}">${esc(item.title)}</a>
     <p class="row-org">${esc(item.org)}</p>
 
     <div class="row-facts">
@@ -616,11 +644,11 @@ async function toggleRowExplain(tenderId) {
 
     if (explained) {
       box.innerHTML = esc(explained.explanation.xulosa)
-        + ` <a href="/tender/${esc(tenderId)}" style="white-space:nowrap">${esc(t('row.more'))}</a>`;
+        + ` <a href="#tender/${esc(tenderId)}" data-go="tender" data-param="${esc(tenderId)}" style="white-space:nowrap">${esc(t('row.more'))}</a>`;
     } else {
       // Tushuntirish hali yaratilmagan — yolg'on va'da bermaymiz
       box.innerHTML = `${esc(t('row.noExplanation'))}
-        <a href="/tender/${esc(tenderId)}">${esc(t('row.viewLots'))}</a>`;
+        <a href="#tender/${esc(tenderId)}" data-go="tender" data-param="${esc(tenderId)}">${esc(t('row.viewLots'))}</a>`;
     }
     box.dataset.loaded = '1';
   } catch (err) {
@@ -756,6 +784,252 @@ async function toggleSave(id, button) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// BITTA E'LON — lotlar va amallar
+// ───────────────────────────────────────────────────────────────────
+// Bu ekranning maqsadi bitta: odam e'londan CHIQMASDAN turib uni
+// tushunsin, o'ziga mosligini bilsin va hujjatini tayyorlasin.
+// ═══════════════════════════════════════════════════════════════════
+async function loadTender(id) {
+  const box = $('#tender-detail');
+  box.innerHTML = `<div class="row-skeleton"><div class="skeleton" style="width:60%;height:22px"></div>
+    <div class="skeleton" style="width:40%"></div><div class="skeleton" style="width:90%"></div></div>`;
+
+  try {
+    const [tender, lotData] = await Promise.all([
+      apiJson(`/api/tenders/${encodeURIComponent(id)}`),
+      apiJson(`/api/tenders/${encodeURIComponent(id)}/lots`).catch(() => ({ lots: [] })),
+    ]);
+    state.currentTender = tender;
+    state.currentLots = lotData.lots || [];
+    renderTenderDetail(tender, state.currentLots);
+  } catch (err) {
+    box.innerHTML = `<div class="empty">
+      <h3>${esc(t('tender.notFound'))}</h3>
+      <p>${esc(err.message)}</p>
+      <button type="button" class="btn btn-secondary" data-go="browse">${esc(t('tender.back'))}</button>
+    </div>`;
+  }
+}
+
+function renderTenderDetail(tender, lots) {
+  const deadline = deadlineText(tender.deadline);
+  const closed = tender.status === 'closed' || tender.status === 'canceled';
+  const saved = state.savedIds.has(tender.id);
+
+  const fact = (label, value, mono = true) => `
+    <div class="tfact">
+      <dt>${esc(label)}</dt>
+      <dd${mono ? ' class="num"' : ''}>${esc(value)}</dd>
+    </div>`;
+
+  $('#tender-detail').innerHTML = `
+    <article class="tdoc" style="--row-accent: var(--s-${esc(tender.soha || 'boshqa')})">
+      <div class="tdoc-top">
+        <span class="row-sector">${esc(sectorName(tender.soha))}</span>
+        <span class="row-dot">·</span>
+        <span class="row-region">${esc(regionName(tender.hudud))}</span>
+        ${tender.isDemo ? `<span class="chip chip-caution">${esc(t('row.demo'))}</span>` : ''}
+        ${closed ? `<span class="chip chip-neutral">${esc(t('time.expired'))}</span>` : ''}
+      </div>
+
+      <h1 class="tdoc-title">${esc(tender.title)}</h1>
+      <p class="tdoc-org">${esc(tender.org)}</p>
+
+      ${tender.isDemo ? `<div class="notice notice-caution" style="margin-bottom:var(--s5)">
+        <strong>${esc(t('tender.demoTitle'))}</strong> ${esc(t('tender.demoText'))}
+      </div>` : ''}
+
+      <dl class="tfacts">
+        ${fact(t('row.budget'), `${tender.budget} ${t('row.som')}`)}
+        ${fact(t('row.deadline'), `${tender.deadline} · ${deadline.text}`)}
+        ${fact(t('row.lots'), String(lots.length || tender.lotCount || 1))}
+        ${tender.postedDate ? fact(t('tender.posted'), tender.postedDate) : ''}
+      </dl>
+
+      ${tender.description ? `<p class="tdoc-desc">${esc(tender.description)}</p>` : ''}
+
+      ${(tender.requirements || []).length ? `
+        <section class="tblock">
+          <h2>${esc(t('tender.requirements'))}</h2>
+          <ul class="tlist">${tender.requirements.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+        </section>` : ''}
+
+      ${(tender.contactEmail || tender.contactPhone) ? `
+        <section class="tblock">
+          <h2>${esc(t('tender.contact'))}</h2>
+          <p class="small">
+            ${tender.contactPhone ? `<span class="num">${esc(tender.contactPhone)}</span>` : ''}
+            ${tender.contactEmail ? ` · ${esc(tender.contactEmail)}` : ''}
+          </p>
+        </section>` : ''}
+
+      <div class="tdoc-actions">
+        <button type="button" class="btn btn-secondary" data-save="${esc(tender.id)}" aria-pressed="${saved}">
+          ${esc(t(saved ? 'row.unsave' : 'row.save'))}
+        </button>
+        ${tender.sourceUrl ? `<a class="btn btn-ghost" href="${esc(tender.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(t('tender.source'))}</a>` : ''}
+      </div>
+    </article>
+
+    <section class="tblock">
+      <h2 class="tlots-head">${esc(t('tender.lotsTitle'))} <span class="tlots-count num">${lots.length}</span></h2>
+      ${lots.length
+        ? lots.map(renderLotCard).join('')
+        : `<p class="muted small">${esc(t('tender.noLots'))}</p>`}
+    </section>`;
+}
+
+/**
+ * Lot kartasi — tushuntirish va amallar bir joyda.
+ * Har bir lotdan uchta yo'l ochiladi: tushunish, o'ziga solishtirish,
+ * hujjat tayyorlash.
+ */
+function renderLotCard(lot) {
+  const exp = lot.explanation || {};
+  const item = (key, label, value) => value
+    ? `<div class="plain-item"><h4>${esc(label)}</h4><p>${esc(value)}</p></div>`
+    : '';
+
+  const docs = Array.isArray(exp.hujjatlar) && exp.hujjatlar.length
+    ? `<div class="plain-item">
+         <h4>${esc(t('lot.docsNeeded'))}</h4>
+         <ul>${exp.hujjatlar.map(h => `<li>${esc(h)}</li>`).join('')}</ul>
+       </div>`
+    : '';
+
+  return `
+  <article class="lotcard" data-lot="${esc(lot.id)}">
+    <div class="lotcard-head">
+      <span class="lotcard-no num">${esc(t('lot.number', { n: lot.lotNumber || 1 }))}</span>
+      <h3>${esc(lot.title)}</h3>
+    </div>
+
+    <dl class="tfacts tfacts-tight">
+      <div class="tfact"><dt>${esc(t('specimen.price'))}</dt><dd class="num">${som(lot.startPrice)} ${esc(t('row.som'))}</dd></div>
+      ${lot.quantity ? `<div class="tfact"><dt>${esc(t('specimen.qty'))}</dt><dd class="num">${esc(lot.quantity)} ${esc(lot.unit || '')}</dd></div>` : ''}
+      <div class="tfact"><dt>${esc(t('row.deadline'))}</dt><dd class="num">${esc(lot.deadline)}</dd></div>
+    </dl>
+
+    ${lot.description ? `<p class="small muted">${esc(lot.description)}</p>` : ''}
+
+    ${exp.xulosa ? `
+      <div class="plain">
+        <span class="plain-label">${esc(t('specimen.plainLabel'))}</span>
+        ${item('nima', t('lot.what'), exp.nima)}
+        ${item('kim', t('lot.who'), exp.kim)}
+        ${docs}
+        ${item('pul', t('lot.money'), exp.pul)}
+        ${item('muddat', t('lot.when'), exp.muddat)}
+        ${exp.model ? `<p class="plain-source">${esc(t('lot.source', { model: exp.model }))}</p>` : ''}
+      </div>` : ''}
+
+    <div class="lotcard-actions">
+      <button type="button" class="btn btn-primary btn-sm" data-lot-docs="${esc(lot.id)}">
+        ${esc(t('lot.makeDocs'))}
+      </button>
+      <button type="button" class="btn btn-secondary btn-sm" data-lot-fit="${esc(lot.id)}">
+        ${esc(t('lot.fit'))}
+      </button>
+    </div>
+
+    <div class="lotcard-fit" id="fit-${esc(lot.id)}" hidden></div>
+  </article>`;
+}
+
+// ── Lotdagi amallar ────────────────────────────────────────────────
+$('#tender-detail').addEventListener('click', async (e) => {
+  const saveBtn = e.target.closest('[data-save]');
+  if (saveBtn) return toggleSave(saveBtn.dataset.save, saveBtn);
+
+  const docsBtn = e.target.closest('[data-lot-docs]');
+  if (docsBtn) return startDocsForLot(docsBtn.dataset.lotDocs);
+
+  const fitBtn = e.target.closest('[data-lot-fit]');
+  if (fitBtn) return checkLotFit(fitBtn.dataset.lotFit, fitBtn);
+});
+
+/** "Menga mos keladimi?" — AI ishlatmaydi, shuning uchun hammaga ochiq */
+async function checkLotFit(lotId, button) {
+  const box = document.getElementById(`fit-${lotId}`);
+  if (!box) return;
+
+  if (!box.hidden) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `<span class="small muted">${esc(t('results.loading'))}</span>`;
+  button.disabled = true;
+
+  try {
+    const profile = {
+      experience: Number(state.user?.experience) || undefined,
+      soha: state.currentTender?.soha,
+      hudud: state.user?.hudud,
+    };
+    const { fit } = await apiJson(`/api/lots/${encodeURIComponent(lotId)}/fit`, {
+      method: 'POST', body: JSON.stringify({ profile }),
+    });
+
+    const tone = fit.verdict === 'mos' ? 'notice-verified'
+      : fit.verdict === 'shoshilinch' ? 'notice-caution' : 'notice-urgent';
+
+    box.innerHTML = `
+      <div class="notice ${tone}">
+        <strong>${esc(fit.verdictText)}</strong>
+        ${fit.blockers?.length ? `<ul class="tlist">${fit.blockers.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
+        ${fit.reasons?.length ? `<ul class="tlist">${fit.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
+      </div>`;
+  } catch (err) {
+    box.innerHTML = `<div class="notice notice-urgent">${esc(err.message)}</div>`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+/**
+ * Lotdan hujjat tayyorlashga o'tish.
+ *
+ * Ilgari hujjat shakli bo'sh ochilardi va odam e'lon nomini, buyurtmachini,
+ * narxni va muddatni QO'LDA ko'chirib yozishi kerak edi — ya'ni mahsulot
+ * "hujjatni tayyorlab beraman" deb va'da qilib, ishning eng zerikarli
+ * qismini o'ziga qoldirardi. Endi lot va profil ma'lumoti shaklga
+ * o'zi tushadi; odam faqat tekshiradi va narxini qo'yadi.
+ */
+function startDocsForLot(lotId) {
+  const lot = (state.currentLots || []).find(l => l.id === lotId);
+  const tender = state.currentTender;
+  if (!lot || !tender) return;
+
+  go('docs');
+
+  const set = (id, value) => {
+    const el = $(id);
+    if (el && value != null && value !== '') el.value = value;
+  };
+
+  // Lotdan. Lot sarlavhasi e'lonnikidan farq qilmasa — takrorlamaymiz;
+  // bitta lotli e'lonlarda ular bir xil bo'ladi.
+  const lotNo = t('lot.number', { n: lot.lotNumber || 1 });
+  const sameTitle = String(lot.title).trim() === String(tender.title).trim();
+  set('#d-tenderName', sameTitle
+    ? `${tender.title} — ${lotNo}`
+    : `${tender.title} — ${lotNo}: ${lot.title}`);
+  set('#d-tenderLot', String(lot.lotNumber || 1));
+  set('#d-buyerOrg', tender.org);
+  set('#d-price', lot.startPrice);
+  set('#d-deliveryTerm', lot.deliveryTerm);
+
+  // Profildan — foydalanuvchi allaqachon bergan ma'lumotni qayta so'ramaymiz
+  set('#d-company', state.user?.company);
+  set('#d-phoneEmail', state.user?.phone);
+
+  $('#docs-from-lot').hidden = false;
+  $('#docs-from-lot-text').textContent = t('docs.fromLot', { title: lot.title });
+
+  const firstEmpty = ['#d-experience', '#d-director', '#d-inn'].map(s => $(s)).find(el => el && !el.value);
+  (firstEmpty || $('#d-company'))?.focus();
+  toast(t('docs.prefilled'), 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // MENING ISHIM
 // ═══════════════════════════════════════════════════════════════════
 async function loadWork() {
@@ -793,7 +1067,8 @@ function renderWorkList(selector, items, emptyTitle, emptyText) {
         <span class="row-region">${esc(regionName(item.hudud))}</span>
         ${item.isDemo ? `<span class="chip chip-caution">${esc(t('row.demo'))}</span>` : ''}
       </div>
-      <a href="/tender/${esc(item.id)}" class="row-title" style="display:block">${esc(item.title)}</a>
+      <a href="#tender/${esc(item.id)}" class="row-title"
+         data-go="tender" data-param="${esc(item.id)}">${esc(item.title)}</a>
       <p class="row-org">${esc(item.org)}</p>
       <div class="row-facts">
         <span class="row-budget">${esc(item.budget)} ${esc(t('row.som'))}</span>
@@ -1399,7 +1674,13 @@ async function loadPlans() {
           ${plan.features.map(f => `<li>${check}<span>${esc(f)}</span></li>`).join('')}
         </ul>
         ${plan.priceMonthly === 0
-          ? `<button type="button" class="btn btn-secondary" data-go="browse">${esc(t('plans.free'))}</button>`
+          // Kirmagan odam uchun "bepul boshlash" — ro'yxatdan o'tish.
+          // Ilgari bu tugma shunchaki bosh ekranga olib chiqib tashlardi:
+          // odam "bepul sinab ko'raman" deb bosib, hech narsa
+          // boshlanmagan holda ro'yxatga qaytib qolardi.
+          ? (state.token
+              ? `<button type="button" class="btn btn-secondary" data-go="browse">${esc(t('plans.free'))}</button>`
+              : `<button type="button" class="btn btn-secondary" data-start-free>${esc(t('plans.freeStart'))}</button>`)
           : `<button type="button" class="btn btn-primary" data-subscribe="${esc(plan.id)}">${esc(t('plans.subscribe'))}</button>`}
       </div>`).join('');
 
@@ -1411,6 +1692,13 @@ async function loadPlans() {
 }
 
 $('#plans').addEventListener('click', async (e) => {
+  // Bepul boshlash — ro'yxatdan o'tish oynasi ochiladi
+  if (e.target.closest('[data-start-free]')) {
+    showAuthMode('register');
+    openModal('auth-modal');
+    return;
+  }
+
   const btn = e.target.closest('[data-subscribe]');
   if (!btn) return;
 
@@ -1633,7 +1921,8 @@ async function init() {
   renderAuthState();
   renderSectorFilter();
 
-  go(location.hash.slice(1) || 'browse', { push: false });
+  const route = parseRoute(location.hash);
+  go(route.view, { push: false, param: route.param });
 
   await loadResults();
   loadStats();

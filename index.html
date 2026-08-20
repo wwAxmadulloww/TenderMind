@@ -227,6 +227,14 @@
       </p>
     </div>
 
+    <!-- Lotdan kelinganda ko'rinadi: qaysi lot uchun tayyorlanayotgani
+         aniq bo'lsin, aks holda to'ldirilgan maydonlar qayerdan
+         kelgani tushunarsiz qoladi. -->
+    <div class="notice notice-seal" id="docs-from-lot" hidden style="margin-bottom:var(--s5)">
+      <strong data-i18n="docs.fromLotLabel">Lotdan olindi:</strong>
+      <span id="docs-from-lot-text"></span>
+    </div>
+
     <form id="doc-form">
       <div class="panel">
         <div class="panel-head"><h3 data-i18n="docs.companySection">Kompaniya</h3></div>
@@ -406,6 +414,23 @@
     </div>
     <div class="plans" id="plans"></div>
     <p class="small muted" id="plans-note" style="margin-top: var(--s5)"></p>
+  </div>
+</section>
+
+<!-- ══ BITTA E'LON ═══════════════════════════════════════════════
+     Ilgari e'lonni bosgan odam ilovadan chiqib, o'qishdan boshqa
+     hech narsa qilib bo'lmaydigan statik sahifaga tushardi: lotlar
+     ko'rinmasdi, hujjat tayyorlashga yo'l yo'q edi. Endi e'lon
+     ilovaning ichida ochiladi va har bir lotdan amal boshlanadi. -->
+<section class="view" id="view-tender">
+  <div class="wrap-narrow">
+    <a href="#browse" class="back-link" data-go="browse">
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M12 4l-6 6 6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span data-i18n="tender.back">E'lonlar ro'yxatiga</span>
+    </a>
+    <div id="tender-detail"></div>
   </div>
 </section>
 
