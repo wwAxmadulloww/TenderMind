@@ -25,6 +25,46 @@ npm run dev:local -- --fresh   # bazani tozalab boshlash
 
 ---
 
+## Ma'lumot manbasi — xarid.uzex.uz
+
+`xarid.uz` javob bermaydi. Amaldagi rasmiy portal — **xarid.uzex.uz**.
+
+U Angular ilovasi, ya'ni sahifadan matn qirqib olish behuda: mazmun JavaScript ishlagandan keyin paydo bo'ladi. Ortida esa ochiq JSON API turadi:
+
+| Endpoint | Nima beradi |
+|---|---|
+| `POST /Common/GetMinimizedLotsList` | Ochiq lotlar ro'yxati (`{"from":1,"to":20}`) |
+| `GET /Common/GetLot/{id}` | Lotning to'liq tafsiloti |
+| `POST /Common/GetCompletedDeals` | Tugagan bitimlar |
+| `GET /Lib/GetRegions`, `/Lib/GetCategories` | Ma'lumotnomalar |
+
+Sahifalash `from`/`to` — 1 dan boshlanadigan, ikki tomoni ham kiradigan oraliq. Har javobda `total_count` bor.
+
+Tafsilotda hamma narsa bor: buyurtmachi, mahsulot ro'yxati (`js_details`), yetkazib berish shartlari (`js_conditions`), boshlang'ich narx, kafolat puli, hudud, aloqa. Ya'ni lotni tushuntirish va hujjat tayyorlash uchun yetarli.
+
+### Nega adapter hozir ishlamaydi
+
+API **o'zini tanitgan mijozni rad etadi**:
+
+```
+User-Agent: TenderMind-Bot/1.0 (+https://tendermind.uz/bot)
+→ 500 {"message": "Приложение : Missing User-Agent header"}
+```
+
+Xabar chalg'ituvchi — sarlavha yuborilgan. Rad etilish sababi: u brauzernikiga o'xshamaydi. `curl`, `python-requests`, hatto `Googlebot` ham shu javobni oladi; faqat to'liq Chrome satri o'tadi. Bu buzuq parser emas, **ataylab qo'yilgan bot filtri**.
+
+Undan o'tish uchun brauzer bo'lib ko'rinish kerak bo'lardi. Loyiha bunday qilmaydi: portal egasi kirishni ataylab cheklagan bo'lsa, uni aldab o'tish — ochiq ma'lumot yig'ish emas, to'siqni chetlab o'tish.
+
+**To'g'ri yo'l:** UzEx bilan rasmiy kelishuv. Moslashtirish kodi (`services/ingestion/sources/uzex.js`) va uning testlari tayyor — ruxsat berilgan zahoti ishlab ketadi.
+
+**Hozircha:** portaldan qo'lda yuklab olingan eksportni kiritish mumkin:
+
+```bash
+npm run ingest -- file --path=./data/eksport.json
+```
+
+---
+
 ## Buyruqlar
 
 | Buyruq | Vazifasi |
@@ -32,7 +72,7 @@ npm run dev:local -- --fresh   # bazani tozalab boshlash
 | `npm start` | Serverni ishga tushirish |
 | `npm run dev` | Avtomatik qayta yuklanadigan rejim |
 | `npm run dev:local` | Xotiradagi MongoDB bilan (Atlas kerak emas) |
-| `npm test` | Testlar (177 ta) |
+| `npm test` | Testlar (188 ta) |
 | `npm run ingest -- file --path=./data/namuna-tenderlar.json` | Ma'lumot import qilish |
 | `npm run bot` | Telegram botni ishga tushirish |
 | `npm run make-admin -- +998901234567` | Foydalanuvchini admin qilish |
@@ -249,7 +289,7 @@ AI kalitlari **formati bo'yicha** tekshiriladi (`gsk_`, `sk-`, `AIza`). Noto'g'r
 npm test
 ```
 
-177 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
+188 ta test. Integratsion testlar xotiradagi MongoDB bilan ishlaydi — tashqi klaster kerak emas.
 
 Qamrov: telefon normalizatsiyasi, tarif limitlari, AI kalit validatsiyasi, route himoyasi, baza uzilgandagi xatti-harakat, lot tushuntirish, ta'lim moduli, admin huquqi, to'lov oqimi, ingestion normalizatsiyasi va dedupe, robots.txt qoidalari, Telegram buyruqlari, SEO sahifalari va indekslash qoidalari.
 
